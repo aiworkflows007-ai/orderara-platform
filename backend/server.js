@@ -411,20 +411,20 @@ const adminDistPath = path.join(__dirname, '../admin-panel/dist');
 const localDistPath = path.join(__dirname, 'dist');
 if (require('fs').existsSync(adminDistPath)) {
   app.use(express.static(adminDistPath));
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) return next();
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api') || req.path === '/health') return next();
     res.sendFile(path.join(adminDistPath, 'index.html'));
   });
 } else if (require('fs').existsSync(localDistPath)) {
   app.use(express.static(localDistPath));
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) return next();
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api') || req.path === '/health') return next();
     res.sendFile(path.join(localDistPath, 'index.html'));
   });
 } else {
   app.get('/', (req, res) => {
     res.json({
-      service: 'OrderAra Backend Engine',
+      service: 'Restaurant Platform Backend Engine',
       status: 'Active',
       apiDocs: {
         restaurants: '/api/restaurants',
