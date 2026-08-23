@@ -1,0 +1,16 @@
+services:
+  restaurant-app:
+    build: .
+    container_name: restaurant-app
+    restart: always
+    ports:
+      - "3009:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+    networks:
+      - the-perfect-mart_default
+
+networks:
+  the-perfect-mart_default:
+    external: true
