@@ -150,7 +150,7 @@ fun ProfileScreen(
                     Column {
                         ProfileOptionItem(
                             icon = Icons.Outlined.Info,
-                            title = "About OrderAra",
+                            title = "About Restaurant",
                             subtitle = "v1.0.0 • Multi-Restaurant Platform",
                             onClick = { }
                         )

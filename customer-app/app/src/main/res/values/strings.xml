@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">OrderAra</string>
-    <string name="tagline">Order from anywhere, delivered fresh!</string>
+    <string name="app_name">Restaurant</string>
+    <string name="tagline">Order from your favorite restaurants, delivered fresh!</string>
 </resources>

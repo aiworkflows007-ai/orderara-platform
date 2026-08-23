@@ -227,7 +227,7 @@ fun SettingsScreen(
                             color = TextLightSecondary
                         )
                         Text(
-                            text = "OrderAra Platform: v1.0.0 Partner",
+                            text = "Restaurant Platform: v1.0.0 Partner",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextLightSecondary
                         )

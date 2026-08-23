@@ -8,22 +8,37 @@ import SubscriptionsHub from './pages/SubscriptionsHub';
 import PlatformSettings from './pages/PlatformSettings';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('subscriptions');
 
   const getPageInfo = () => {
     switch (activeTab) {
-      case 'overview':
-        return { title: 'Platform Control Overview', subtitle: 'Real-time metrics, MRR growth, and live platform pulse' };
-      case 'restaurants':
-        return { title: 'Restaurant Directory', subtitle: 'Manage registered restaurants, free trials, and listing statuses' };
-      case 'orders':
-        return { title: 'Live Multi-Restaurant Orders Pulse', subtitle: 'Monitor real-time sub-orders across all kitchens' };
       case 'subscriptions':
-        return { title: 'Subscription & Revenue Hub', subtitle: 'Track monthly plans (₹999/mo), free trials, and auto-suspensions' };
+        return { 
+          title: 'Restaurant Subscriptions & MRR Management', 
+          subtitle: 'Manage flat ₹999/mo partner subscriptions, 14-day free trials, and auto-suspensions' 
+        };
+      case 'restaurants':
+        return { 
+          title: 'Partner Restaurants Directory', 
+          subtitle: 'Manage onboarded restaurant businesses, delivery radius, and subscription listings' 
+        };
+      case 'overview':
+        return { 
+          title: 'Platform Overview Dashboard', 
+          subtitle: 'Real-time metrics, MRR growth, and platform activity pulse' 
+        };
+      case 'orders':
+        return { 
+          title: 'Live Multi-Restaurant Orders Pulse', 
+          subtitle: 'Monitor real-time sub-orders across all restaurant kitchens' 
+        };
       case 'settings':
-        return { title: 'Platform Settings & Promos', subtitle: 'Manage global coupons, pricing rules, and server configurations' };
+        return { 
+          title: 'Subscription Policies & Billing Settings', 
+          subtitle: 'Configure subscription fee, free trial duration, grace period, and global promo codes' 
+        };
       default:
-        return { title: 'OrderAra HQ', subtitle: 'Platform Management' };
+        return { title: 'Restaurant Partner Portal', subtitle: 'Subscription & Management Hub' };
     }
   };
 
@@ -44,10 +59,10 @@ export default function App() {
 
         <main className="flex-1 overflow-y-auto p-8">
           <div className="max-w-7xl mx-auto">
-            {activeTab === 'overview' && <DashboardOverview setActiveTab={setActiveTab} />}
-            {activeTab === 'restaurants' && <RestaurantsManagement />}
-            {activeTab === 'orders' && <LiveOrdersMonitor />}
             {activeTab === 'subscriptions' && <SubscriptionsHub />}
+            {activeTab === 'restaurants' && <RestaurantsManagement />}
+            {activeTab === 'overview' && <DashboardOverview setActiveTab={setActiveTab} />}
+            {activeTab === 'orders' && <LiveOrdersMonitor />}
             {activeTab === 'settings' && <PlatformSettings />}
           </div>
         </main>

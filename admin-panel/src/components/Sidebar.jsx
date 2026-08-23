@@ -1,21 +1,22 @@
 import React from 'react';
 import { 
-  LayoutDashboard, 
-  Store, 
-  ShoppingBag, 
   CreditCard, 
+  Store, 
+  LayoutDashboard, 
+  ShoppingBag, 
   Sliders, 
   Flame,
-  ShieldCheck
+  ShieldCheck,
+  BadgePercent
 } from 'lucide-react';
 
 export default function Sidebar({ activeTab, setActiveTab }) {
   const menuItems = [
-    { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'restaurants', label: 'Restaurants', icon: Store, badge: '28' },
-    { id: 'orders', label: 'Live Orders Pulse', icon: ShoppingBag, badge: 'LIVE', badgeColor: 'bg-emerald-500' },
-    { id: 'subscriptions', label: 'Subscriptions & MRR', icon: CreditCard },
-    { id: 'settings', label: 'Platform Settings', icon: Sliders },
+    { id: 'subscriptions', label: 'Subscription & MRR Hub', icon: CreditCard, badge: '₹999/mo', badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' },
+    { id: 'restaurants', label: 'Partner Restaurants', icon: Store, badge: '28' },
+    { id: 'overview', label: 'Platform Dashboard', icon: LayoutDashboard },
+    { id: 'orders', label: 'Live Orders Pulse', icon: ShoppingBag, badge: 'LIVE', badgeColor: 'bg-orange-500/20 text-orange-400 border border-orange-500/30' },
+    { id: 'settings', label: 'Billing & Settings', icon: Sliders },
   ];
 
   return (
@@ -28,12 +29,12 @@ export default function Sidebar({ activeTab, setActiveTab }) {
           </div>
           <div>
             <h1 className="text-lg font-black tracking-tight text-white flex items-center gap-1.5">
-              OrderAra
+              Restaurant
               <span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20">
-                HQ
+                Partner
               </span>
             </h1>
-            <p className="text-xs font-medium text-slate-400">Platform Control Center</p>
+            <p className="text-xs font-medium text-slate-400">Subscription & Management</p>
           </div>
         </div>
       </div>
@@ -41,7 +42,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
       {/* Navigation Items */}
       <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
         <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-          Main Modules
+          Partner Management
         </div>
         {menuItems.map((item) => {
           const Icon = item.icon;
@@ -85,7 +86,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
               <p className="text-xs font-bold text-slate-200">Ashok Sharma</p>
               <p className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Super Admin
+                Platform Owner
               </p>
             </div>
           </div>

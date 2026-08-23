@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "VigiZoomatoCustomer"
+rootProject.name = "RestaurantCustomer"
 include(":app")

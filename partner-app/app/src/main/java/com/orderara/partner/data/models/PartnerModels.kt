@@ -84,7 +84,7 @@ data class RestaurantProfile(
 
 @Serializable
 data class SubscriptionInfo(
-    val planName: String = "OrderAra Unlimited Partner Plan",
+    val planName: String = "Restaurant Unlimited Partner Plan",
     val priceMonthly: Double = 999.0,
     val isTrialActive: Boolean = true,
     val trialDaysRemaining: Int = 12,
