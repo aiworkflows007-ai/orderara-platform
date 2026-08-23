@@ -234,6 +234,100 @@ app.get('/api/restaurants', (req, res) => {
   res.json({ success: true, data: restaurants });
 });
 
+// 1b. Register New Restaurant (from Partner App -> Syncs across all Customer Apps & Web Portal)
+app.post('/api/partner/register', (req, res) => {
+  const {
+    id,
+    name,
+    description,
+    phone,
+    email,
+    address,
+    deliveryRadiusKm,
+    minOrderValue,
+    isVegOnly,
+    cuisineTypes,
+    upiId
+  } = req.body;
+
+  const restId = id || `rest_${Date.now()}`;
+  const bannerImages = [
+    "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1552566626-52f8b828add9?w=800&auto=format&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=800&auto=format&fit=crop&q=80"
+  ];
+  const chosenBanner = bannerImages[Math.floor(Math.random() * bannerImages.length)];
+
+  const newRestaurant = {
+    id: restId,
+    name: name || "New Restaurant",
+    description: description || (Array.isArray(cuisineTypes) ? cuisineTypes.join(', ') : "Authentic Delicacies & Fresh Cuisine"),
+    bannerUrl: chosenBanner,
+    rating: 5.0,
+    totalRatings: 1,
+    deliveryTimeMinutes: 25,
+    distanceKm: 2.1,
+    deliveryRadiusKm: Number(deliveryRadiusKm) || 7.0,
+    minOrderValue: Number(minOrderValue) || 199.0,
+    isVegOnly: !!isVegOnly,
+    isPromoted: true,
+    discountOffer: "Flat ₹50 OFF",
+    cuisineTypes: Array.isArray(cuisineTypes) && cuisineTypes.length ? cuisineTypes : ["Multi-Cuisine"],
+    isOpen: true,
+    phone: phone || "",
+    email: email || "",
+    address: address || "",
+    upiId: upiId || "pay@upi"
+  };
+
+  // Add starter menu items
+  const starterItems = [
+    {
+      id: `menu_${restId}_1`,
+      restaurantId: restId,
+      name: `Signature ${newRestaurant.name} Special`,
+      description: "Chef's recommended gourmet special recipe prepared fresh with finest ingredients",
+      price: 260.0,
+      category: "Bestsellers",
+      imageUrl: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80",
+      isVeg: !!isVegOnly,
+      isAvailable: true,
+      isBestSeller: true,
+      spicyLevel: 1
+    },
+    {
+      id: `menu_${restId}_2`,
+      restaurantId: restId,
+      name: "Crispy Starter Delight",
+      description: "Crunchy appetizing platter served with artisanal dips and garnish",
+      price: 180.0,
+      category: "Starters",
+      imageUrl: "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=800&auto=format&fit=crop&q=80",
+      isVeg: true,
+      isAvailable: true,
+      isBestSeller: false,
+      spicyLevel: 1
+    }
+  ];
+
+  menuItems.push(...starterItems);
+  restaurants.unshift(newRestaurant);
+
+  // Broadcast to all active customer apps and admin web portals
+  io.emit('restaurant:new', newRestaurant);
+  io.emit('restaurants:updated', restaurants);
+
+  console.log(`[API] New Restaurant Registered: ${newRestaurant.name} (ID: ${newRestaurant.id})`);
+  res.status(201).json({ success: true, data: newRestaurant, menuItems: starterItems });
+});
+
+app.post('/api/restaurants', (req, res) => {
+  // Alias for /api/partner/register
+  req.url = '/api/partner/register';
+  return app._router.handle(req, res);
+});
+
 // 2. Get Single Restaurant Detail with Menu
 app.get('/api/restaurants/:id', (req, res) => {
   const rest = restaurants.find(r => r.id === req.params.id);
