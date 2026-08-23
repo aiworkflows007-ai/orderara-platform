@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,7 +21,8 @@ import com.orderara.partner.ui.theme.*
 
 @Composable
 fun SettingsScreen(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onNavigateToOnboarding: () -> Unit = {}
 ) {
     val authRepo = OrderAraPartnerApp.instance.authRepository
     val profile by authRepo.currentProfile.collectAsState()
@@ -231,6 +233,19 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = TextLightSecondary
                         )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        OutlinedButton(
+                            onClick = onNavigateToOnboarding,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = PartnerPrimary)
+                        ) {
+                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("+ Register Another Restaurant", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }

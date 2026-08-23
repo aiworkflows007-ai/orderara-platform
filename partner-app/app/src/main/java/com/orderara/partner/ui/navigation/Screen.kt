@@ -1,6 +1,8 @@
 package com.orderara.partner.ui.navigation
 
 sealed class Screen(val route: String) {
+    object Onboarding : Screen("onboarding")
+    object Login : Screen("login")
     object Orders : Screen("orders")
     object Menu : Screen("menu")
     object Analytics : Screen("analytics")

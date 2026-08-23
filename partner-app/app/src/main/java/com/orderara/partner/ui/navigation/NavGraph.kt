@@ -9,12 +9,11 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.orderara.partner.OrderAraPartnerApp
-import com.orderara.partner.data.models.StaffRole
 import com.orderara.partner.ui.components.PartnerBottomBar
-import com.orderara.partner.ui.components.PartnerTab
 import com.orderara.partner.ui.screens.analytics.AnalyticsScreen
 import com.orderara.partner.ui.screens.chat.PartnerChatScreen
 import com.orderara.partner.ui.screens.menu.MenuManagementScreen
+import com.orderara.partner.ui.screens.onboarding.RestaurantOnboardingScreen
 import com.orderara.partner.ui.screens.orders.PartnerOrdersScreen
 import com.orderara.partner.ui.screens.settings.SettingsScreen
 import com.orderara.partner.ui.screens.subscription.SubscriptionScreen
@@ -59,6 +58,21 @@ fun PartnerNavGraph(
             startDestination = Screen.Orders.route,
             modifier = Modifier.padding(innerPadding)
         ) {
+            composable(Screen.Onboarding.route) {
+                RestaurantOnboardingScreen(
+                    onRegistrationComplete = {
+                        navController.navigate(Screen.Orders.route) {
+                            popUpTo(Screen.Onboarding.route) { inclusive = true }
+                        }
+                    },
+                    onLoginClick = {
+                        navController.navigate(Screen.Orders.route) {
+                            popUpTo(Screen.Onboarding.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
+
             composable(Screen.Orders.route) {
                 PartnerOrdersScreen(
                     onNavigateToChat = { subOrderId, customerName ->
@@ -80,7 +94,11 @@ fun PartnerNavGraph(
             }
 
             composable(Screen.Settings.route) {
-                SettingsScreen()
+                SettingsScreen(
+                    onNavigateToOnboarding = {
+                        navController.navigate(Screen.Onboarding.route)
+                    }
+                )
             }
 
             composable(
