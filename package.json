@@ -1,0 +1,14 @@
+{
+  "name": "orderara-platform",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cd admin-panel && npm install && npm run build && cd ../backend && npm install",
+    "start": "node backend/server.js",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:admin": "cd admin-panel && npm run dev"
+  },
+  "keywords": ["food-delivery", "orderara", "multi-restaurant"],
+  "author": "",
+  "license": "ISC"
+}

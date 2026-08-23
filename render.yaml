@@ -1,0 +1,29 @@
+services:
+  # Option 1: Unified OrderAra Backend & Admin Platform (Single Service)
+  - type: web
+    name: orderara-platform
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+
+  # Option 2: Standalone Static Site for Admin Panel (Optional)
+  - type: web
+    name: orderara-admin-panel
+    runtime: static
+    plan: free
+    region: oregon
+    rootDir: admin-panel
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
