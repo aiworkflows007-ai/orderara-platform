@@ -219,9 +219,10 @@ fun SettingsScreen(
                             color = TextLight
                         )
                         Text(
-                            text = "Linked Bank Account: ${profile.bankAccount}",
+                            text = "⚡ Linked UPI ID: ${profile.upiId}",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = TextLightSecondary
+                            fontWeight = FontWeight.Bold,
+                            color = SuccessEmerald
                         )
                         Text(
                             text = "Registered Email: ${profile.email}",

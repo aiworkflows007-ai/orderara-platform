@@ -79,7 +79,8 @@ data class RestaurantProfile(
     val isOpen: Boolean = true,
     val rating: Double = 4.6,
     val totalOrdersServed: Int = 1420,
-    val bankAccount: String = "HDFC Bank •••• 4920"
+    val upiId: String = "royalbiryani@okhdfcbank",
+    val bankAccount: String = "royalbiryani@okhdfcbank"
 )
 
 @Serializable

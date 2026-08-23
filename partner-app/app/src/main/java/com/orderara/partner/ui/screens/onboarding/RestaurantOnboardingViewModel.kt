@@ -21,11 +21,9 @@ data class OnboardingFormState(
     val city: String = "Bangalore",
     val deliveryRadiusKm: Double = 7.0,
     val minOrderValue: Double = 199.0,
-    // Step 3: Bank Payouts
-    val accountHolder: String = "",
-    val bankName: String = "HDFC Bank",
-    val accountNumber: String = "",
-    val ifscCode: String = "",
+    // Step 3: UPI Payouts
+    val upiId: String = "",
+    val upiHolderName: String = "",
     // State
     val isSubmitting: Boolean = false,
     val errorMessage: String? = null
@@ -55,10 +53,14 @@ class RestaurantOnboardingViewModel : ViewModel() {
     fun updateRadius(radius: Double) = _uiState.update { it.copy(deliveryRadiusKm = radius) }
     fun updateMinOrder(minOrder: Double) = _uiState.update { it.copy(minOrderValue = minOrder) }
 
-    fun updateAccountHolder(holder: String) = _uiState.update { it.copy(accountHolder = holder) }
-    fun updateBankName(bank: String) = _uiState.update { it.copy(bankName = bank) }
-    fun updateAccountNumber(num: String) = _uiState.update { it.copy(accountNumber = num) }
-    fun updateIfsc(ifsc: String) = _uiState.update { it.copy(ifscCode = ifsc) }
+    fun updateUpiId(upi: String) = _uiState.update { it.copy(upiId = upi.trim()) }
+    fun updateUpiHolderName(name: String) = _uiState.update { it.copy(upiHolderName = name) }
+    fun appendUpiHandle(handle: String) {
+        _uiState.update { state ->
+            val clean = state.upiId.split("@")[0]
+            state.copy(upiId = "$clean$handle")
+        }
+    }
 
     fun nextStep(): Boolean {
         val s = _uiState.value
@@ -76,8 +78,8 @@ class RestaurantOnboardingViewModel : ViewModel() {
                 }
             }
             3 -> {
-                if (s.accountNumber.isBlank() || s.accountHolder.isBlank()) {
-                    _uiState.update { it.copy(errorMessage = "Please enter bank account details for daily payouts") }
+                if (s.upiId.isBlank() || !s.upiId.contains("@")) {
+                    _uiState.update { it.copy(errorMessage = "Please enter a valid UPI ID (e.g. yourname@okhdfcbank)") }
                     return false
                 }
             }
@@ -96,7 +98,7 @@ class RestaurantOnboardingViewModel : ViewModel() {
         val s = _uiState.value
         _uiState.update { it.copy(isSubmitting = true) }
 
-        val bankSummary = "${s.bankName} (•••• ${s.accountNumber.takeLast(4).ifEmpty { "1234" }})"
+        val finalUpi = s.upiId.ifEmpty { "${s.phone.replace("+", "").replace(" ", "")}@upi" }
 
         authRepo.registerNewRestaurant(
             name = s.restaurantName.ifEmpty { "My Gourmet Restaurant" },
@@ -107,7 +109,7 @@ class RestaurantOnboardingViewModel : ViewModel() {
             cuisines = s.selectedCuisines.toList().ifEmpty { listOf("Multi-Cuisine") },
             deliveryRadiusKm = s.deliveryRadiusKm,
             minOrderValue = s.minOrderValue,
-            bankDetails = bankSummary
+            upiId = finalUpi
         )
 
         onSuccess()

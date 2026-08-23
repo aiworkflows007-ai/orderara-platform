@@ -39,6 +39,10 @@ fun RestaurantOnboardingScreen(
         "Chinese", "Mughlai", "Kebabs", "Fast Food", "Desserts", "Bakery", "Cafe"
     )
 
+    val popularUpiHandles = listOf(
+        "@okhdfcbank", "@okaxis", "@okicici", "@oksbi", "@ybl", "@paytm", "@ibl"
+    )
+
     Scaffold(
         containerColor = DarkNavy,
         topBar = {
@@ -62,7 +66,7 @@ fun RestaurantOnboardingScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Store,
+                                imageVector = Icons.Default.Storefront,
                                 contentDescription = null,
                                 tint = Color.White,
                                 modifier = Modifier.size(22.dp)
@@ -102,7 +106,7 @@ fun RestaurantOnboardingScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    listOf("1. Details", "2. Location", "3. Payouts", "4. Launch").forEachIndexed { idx, label ->
+                    listOf("1. Details", "2. Location", "3. UPI Payout", "4. Launch").forEachIndexed { idx, label ->
                         val stepNum = idx + 1
                         val isActive = state.currentStep >= stepNum
                         val isCurrent = state.currentStep == stepNum
@@ -435,7 +439,7 @@ fun RestaurantOnboardingScreen(
                 }
             }
 
-            // STEP 3: Bank Account for Daily Payouts
+            // STEP 3: Pure UPI Payout Details
             if (state.currentStep == 3) {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = SurfaceDark),
@@ -445,18 +449,25 @@ fun RestaurantOnboardingScreen(
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                imageVector = Icons.Default.AccountBalance,
+                                imageVector = Icons.Default.FlashOn,
                                 contentDescription = null,
                                 tint = SuccessEmerald,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(22.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Daily Bank Payout Details",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
+                            Column {
+                                Text(
+                                    text = "Instant Daily UPI Payouts",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = "All customer payments settle directly to your UPI ID",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TextLightSecondary
+                                )
+                            }
                         }
 
                         Card(
@@ -472,7 +483,7 @@ fun RestaurantOnboardingScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "100% Direct Payouts • 0% Commission on all orders",
+                                    text = "⚡ 100% Direct UPI Settlement • 0% Commission",
                                     color = SuccessEmerald,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
@@ -481,9 +492,55 @@ fun RestaurantOnboardingScreen(
                         }
 
                         OutlinedTextField(
-                            value = state.accountHolder,
-                            onValueChange = { viewModel.updateAccountHolder(it) },
-                            label = { Text("Account Holder / Legal Business Name *") },
+                            value = state.upiId,
+                            onValueChange = { viewModel.updateUpiId(it) },
+                            label = { Text("Enter UPI ID (VPA) *") },
+                            placeholder = { Text("e.g. royalbiryani@okhdfcbank") },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = PartnerPrimary,
+                                unfocusedBorderColor = CardBorderDark
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        // Quick UPI Handle Suffix Chips
+                        Text(
+                            text = "Quick Handles:",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextLightSecondary
+                        )
+
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            popularUpiHandles.forEach { handle ->
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(CardBorderDark)
+                                        .clickable { viewModel.appendUpiHandle(handle) }
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = handle,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = TextLight
+                                    )
+                                }
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = state.upiHolderName,
+                            onValueChange = { viewModel.updateUpiHolderName(it) },
+                            label = { Text("Account Holder / UPI Name") },
                             placeholder = { Text("e.g. Royal Biryani Hospitality LLP") },
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
@@ -495,51 +552,17 @@ fun RestaurantOnboardingScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
 
-                        OutlinedTextField(
-                            value = state.bankName,
-                            onValueChange = { viewModel.updateBankName(it) },
-                            label = { Text("Bank Name *") },
-                            placeholder = { Text("e.g. HDFC Bank") },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedBorderColor = PartnerPrimary,
-                                unfocusedBorderColor = CardBorderDark
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        OutlinedTextField(
-                            value = state.accountNumber,
-                            onValueChange = { viewModel.updateAccountNumber(it) },
-                            label = { Text("Bank Account Number *") },
-                            placeholder = { Text("50100456789012") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedBorderColor = PartnerPrimary,
-                                unfocusedBorderColor = CardBorderDark
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        OutlinedTextField(
-                            value = state.ifscCode,
-                            onValueChange = { viewModel.updateIfsc(it.uppercase()) },
-                            label = { Text("IFSC Code *") },
-                            placeholder = { Text("HDFC0001234") },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedBorderColor = PartnerPrimary,
-                                unfocusedBorderColor = CardBorderDark
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = DarkNavy),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text(
+                                text = "ℹ️ Payouts are transferred automatically to this UPI ID every night without any transaction fees or commission cuts.",
+                                color = TextLightSecondary,
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -599,6 +622,10 @@ fun RestaurantOnboardingScreen(
                                 Text("${state.ownerName} (${state.phone})", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Daily Payout UPI:", color = TextLightSecondary, fontSize = 12.sp)
+                                Text(state.upiId.ifEmpty { "Registered UPI" }, color = SuccessEmerald, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("Service Radius:", color = TextLightSecondary, fontSize = 12.sp)
                                 Text("${state.deliveryRadiusKm.toInt()} km", color = PartnerPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
@@ -616,10 +643,10 @@ fun RestaurantOnboardingScreen(
                             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 listOf(
                                     "✓ 0% Commission on unlimited customer orders",
+                                    "✓ Direct daily instant UPI payouts to ${state.upiId.ifEmpty { "your UPI" }}",
                                     "✓ Live Kitchen Display System (KDS) & KOT tickets",
                                     "✓ Instant out-of-stock menu toggles",
-                                    "✓ Direct restaurant-to-customer chat & dispatch",
-                                    "✓ Automated daily bank payouts"
+                                    "✓ Direct restaurant-to-customer chat & dispatch"
                                 ).forEach { benefit ->
                                     Text(
                                         text = benefit,

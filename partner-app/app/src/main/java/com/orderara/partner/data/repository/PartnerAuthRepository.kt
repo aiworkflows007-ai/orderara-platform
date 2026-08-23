@@ -50,7 +50,7 @@ class PartnerAuthRepository {
         cuisines: List<String>,
         deliveryRadiusKm: Double,
         minOrderValue: Double,
-        bankDetails: String
+        upiId: String
     ) {
         val newId = "rest_${UUID.randomUUID().toString().take(8)}"
         val newProfile = RestaurantProfile(
@@ -65,7 +65,8 @@ class PartnerAuthRepository {
             isOpen = true,
             rating = 5.0,
             totalOrdersServed = 0,
-            bankAccount = bankDetails
+            upiId = upiId,
+            bankAccount = upiId
         )
 
         val ownerStaff = StaffMember(
