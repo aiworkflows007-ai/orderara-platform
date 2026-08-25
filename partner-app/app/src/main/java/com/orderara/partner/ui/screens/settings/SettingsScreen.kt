@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -196,7 +197,18 @@ fun SettingsScreen(
                             .padding(10.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("✓ Store settings updated successfully!", color = SuccessEmerald, fontWeight = FontWeight.Bold)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                tint = SuccessEmerald,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text("Store settings updated successfully!", color = SuccessEmerald, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
@@ -219,7 +231,7 @@ fun SettingsScreen(
                             color = TextLight
                         )
                         Text(
-                            text = "⚡ Linked UPI ID: ${profile.upiId}",
+                            text = "Linked UPI ID: ${profile.upiId}",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold,
                             color = SuccessEmerald

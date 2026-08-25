@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -93,13 +94,29 @@ fun SearchScreen(
                         FilterChip(
                             selected = uiState.minRating == 4.0,
                             onClick = { viewModel.setMinRating(4.0) },
-                            label = { Text("★ 4.0+", fontSize = 12.sp) }
+                            label = { Text("4.0+", fontSize = 12.sp) },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Filled.Star,
+                                    contentDescription = null,
+                                    tint = GoldStar,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
                         )
 
                         FilterChip(
                             selected = uiState.minRating == 4.5,
                             onClick = { viewModel.setMinRating(4.5) },
-                            label = { Text("★ 4.5+", fontSize = 12.sp) }
+                            label = { Text("4.5+", fontSize = 12.sp) },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Filled.Star,
+                                    contentDescription = null,
+                                    tint = GoldStar,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
                         )
                     }
                 }

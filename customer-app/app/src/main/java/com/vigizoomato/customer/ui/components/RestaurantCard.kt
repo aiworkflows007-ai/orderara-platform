@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocalOffer
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.ElectricBolt
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -120,6 +122,30 @@ fun RestaurantCard(
                     }
                 }
 
+                if (!restaurant.isOpen) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.55f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color.Black.copy(alpha = 0.85f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = "CURRENTLY CLOSED",
+                                color = SurfaceWhite,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 1.sp,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+
                 // Bottom row over image: Discount Pill & Time/Distance Capsule
                 Row(
                     modifier = Modifier
@@ -137,12 +163,23 @@ fun RestaurantCard(
                                 .border(1.dp, PrimaryOrange.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
-                            Text(
-                                text = "🏷️ $offer",
-                                color = SurfaceWhite,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.ExtraBold
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Icon(
+                                    Icons.Filled.LocalOffer,
+                                    contentDescription = null,
+                                    tint = SurfaceWhite,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Text(
+                                    text = offer,
+                                    color = SurfaceWhite,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                            }
                         }
                     } ?: Spacer(modifier = Modifier.width(1.dp))
 
@@ -251,8 +288,14 @@ fun RestaurantCard(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        Icon(
+                            Icons.Filled.Place,
+                            contentDescription = null,
+                            tint = TextSecondary,
+                            modifier = Modifier.size(13.dp)
+                        )
                         Text(
-                            text = "📍 ${restaurant.distanceKm} km",
+                            text = "${restaurant.distanceKm} km",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondary,
                             fontWeight = FontWeight.Medium

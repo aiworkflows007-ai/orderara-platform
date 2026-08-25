@@ -1,5 +1,8 @@
 package com.vigizoomato.customer.ui.screens.home
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vigizoomato.customer.VigiZoomatoApp
@@ -28,6 +31,21 @@ data class HomeUiState(
     val cartSummary: CartSummary
 )
 
+/** One tile in the "What's on your mind?" rail. */
+data class Cuisine(
+    val name: String,
+    val photoUrl: String? = null,
+    val icon: ImageVector? = null
+)
+
+/**
+ * Tiles render at 62dp; on a 3x screen that is ~190px, so 200px wide is the
+ * smallest size that still looks crisp. Requesting a bigger crop would just
+ * burn the customer's mobile data.
+ */
+private fun dishPhoto(id: String) =
+    "https://images.unsplash.com/photo-$id?w=200&h=200&auto=format&fit=crop&q=80"
+
 class HomeViewModel(
     private val restaurantRepository: RestaurantRepository = VigiZoomatoApp.container.restaurantRepository,
     private val cartRepository: CartRepository = VigiZoomatoApp.container.cartRepository,
@@ -38,14 +56,19 @@ class HomeViewModel(
     private val _isVegOnly = MutableStateFlow(false)
     private val _sortBy = MutableStateFlow("Popular")
 
-    val cuisines = listOf(
-        "All" to "🍽️",
-        "Biryani" to "🍗",
-        "Pizza" to "🍕",
-        "South Indian" to "🥞",
-        "Burgers" to "🍔",
-        "Chinese" to "🥢",
-        "Desserts" to "🍰"
+    // Dish photos, not emoji and not monochrome glyphs. A cuisine rail is asking
+    // "what do you feel like eating" -- appetite appeal is the job, and a photo of
+    // the actual dish does that far better than an abstract icon.
+    // "All" deliberately keeps an icon: it is not a cuisine, it clears the filter,
+    // so it should not look like one more dish to choose from.
+    val cuisines: List<Cuisine> = listOf(
+        Cuisine("All", icon = Icons.Filled.Restaurant),
+        Cuisine("Biryani", photoUrl = dishPhoto("1563379091339-03b21ab4a4f8")),
+        Cuisine("Pizza", photoUrl = dishPhoto("1574071318508-1cdbab80d002")),
+        Cuisine("South Indian", photoUrl = dishPhoto("1589301760014-d929f3979dbc")),
+        Cuisine("Burgers", photoUrl = dishPhoto("1568901346375-23c9450c58cd")),
+        Cuisine("Chinese", photoUrl = dishPhoto("1585032226651-759b368d7246")),
+        Cuisine("Desserts", photoUrl = dishPhoto("1551024506-0bccd828d307"))
     )
 
     private val filtersFlow = combine(_selectedCuisine, _isVegOnly, _sortBy) { c, v, s ->

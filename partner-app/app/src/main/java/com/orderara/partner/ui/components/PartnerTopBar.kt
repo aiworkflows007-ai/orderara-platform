@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -63,7 +64,18 @@ fun PartnerTopBar(
                                 .background(SuccessEmerald.copy(alpha = 0.2f))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
-                            Text("★ ${profile.rating}", color = SuccessEmerald, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Icon(
+                                    Icons.Filled.Star,
+                                    contentDescription = null,
+                                    tint = SuccessEmerald,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text("${profile.rating}", color = SuccessEmerald, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
 

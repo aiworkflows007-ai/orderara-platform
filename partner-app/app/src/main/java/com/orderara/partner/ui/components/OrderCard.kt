@@ -12,7 +12,14 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeliveryDining
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.material.icons.outlined.Cancel
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Phone
+import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -86,6 +93,7 @@ fun OrderCard(
                     PartnerOrderStatus.OUT_FOR_DELIVERY -> InfoBlue
                     PartnerOrderStatus.DELIVERED -> SuccessEmerald
                     PartnerOrderStatus.REJECTED -> AlertRed
+                    PartnerOrderStatus.CANCELLED -> AlertRed
                 }
 
                 Box(
@@ -115,39 +123,83 @@ fun OrderCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "👤 ${order.customerName}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                    Text(
-                        text = "📍 ${order.deliveryAddress}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary,
-                        maxLines = 1
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            Icons.Outlined.Person,
+                            contentDescription = null,
+                            tint = TextSecondary,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Text(
+                            text = order.customerName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            Icons.Outlined.Place,
+                            contentDescription = null,
+                            tint = TextSecondary,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Text(
+                            text = order.deliveryAddress,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary,
+                            maxLines = 1
+                        )
+                    }
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                // 48dp tap area (Android minimum) with a 36dp visible circle inside.
+                // A kitchen is the worst possible place to need a precise tap.
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     IconButton(
                         onClick = onChatClick,
+                        // Label belongs on the button, not the 18dp icon inside it --
+                        // IconButton does not merge child semantics, so a label on the
+                        // icon leaves the actual button nameless to a screen reader.
                         modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(SurfaceWhite)
+                            .size(48.dp)
+                            .semantics { contentDescription = "Chat customer" }
                     ) {
-                        Icon(Icons.AutoMirrored.Outlined.Chat, contentDescription = "Chat", tint = PartnerPrimary, modifier = Modifier.size(18.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(SurfaceWhite),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.AutoMirrored.Outlined.Chat, contentDescription = null, tint = PartnerPrimary, modifier = Modifier.size(18.dp))
+                        }
                     }
 
                     IconButton(
                         onClick = onCallClick,
+                        // Label belongs on the button, not the 18dp icon inside it --
+                        // IconButton does not merge child semantics, so a label on the
+                        // icon leaves the actual button nameless to a screen reader.
                         modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(SurfaceWhite)
+                            .size(48.dp)
+                            .semantics { contentDescription = "Call customer" }
                     ) {
-                        Icon(Icons.Outlined.Phone, contentDescription = "Call", tint = SuccessEmerald, modifier = Modifier.size(18.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(SurfaceWhite),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Outlined.Phone, contentDescription = null, tint = SuccessEmerald, modifier = Modifier.size(18.dp))
+                        }
                     }
                 }
             }
@@ -161,12 +213,23 @@ fun OrderCard(
                         .background(WarningAmberLight)
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
-                    Text(
-                        text = "📝 Notes: ${order.specialInstructions}",
-                        color = TextPrimary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            Icons.Outlined.EditNote,
+                            contentDescription = null,
+                            tint = TextPrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "Notes: ${order.specialInstructions}",
+                            color = TextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
 
@@ -203,7 +266,7 @@ fun OrderCard(
 
                             Column {
                                 Text(
-                                    text = "${item.quantity}x ${item.menuItem.name}",
+                                    text = "${item.quantity}x ${item.name}",
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Bold,
                                     color = if (isChecked) TextSecondary else TextPrimary
@@ -345,16 +408,27 @@ fun OrderCard(
                             .padding(10.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "✓ Sub-Order Successfully Delivered",
-                            color = SuccessEmerald,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.CheckCircle,
+                                contentDescription = null,
+                                tint = SuccessEmerald,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "Sub-Order Successfully Delivered",
+                                color = SuccessEmerald,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
                     }
                 }
 
-                PartnerOrderStatus.REJECTED -> {
+                PartnerOrderStatus.REJECTED, PartnerOrderStatus.CANCELLED -> {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -363,12 +437,23 @@ fun OrderCard(
                             .padding(10.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "✕ Order Rejected",
-                            color = AlertRed,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.Cancel,
+                                contentDescription = null,
+                                tint = AlertRed,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = if (order.status == PartnerOrderStatus.REJECTED) "Order Rejected" else "Order Cancelled",
+                                color = AlertRed,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
                     }
                 }
             }

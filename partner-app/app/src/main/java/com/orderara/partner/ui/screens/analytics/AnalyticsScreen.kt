@@ -27,6 +27,10 @@ fun AnalyticsScreen(
     viewModel: AnalyticsViewModel = viewModel(),
     modifier: Modifier = Modifier
 ) {
+    LaunchedEffect(Unit) {
+        viewModel.refresh()
+    }
+
     val analytics by viewModel.analytics.collectAsState()
 
     Scaffold(
@@ -110,7 +114,7 @@ fun AnalyticsScreen(
                             color = TextLight
                         )
 
-                        val maxEarnings = analytics.weeklyRevenueTrend.maxOf { it.second }
+                        val maxEarnings = (analytics.weeklyRevenueTrend.maxOfOrNull { it.second } ?: 1.0).let { if (it <= 0.0) 1.0 else it }
 
                         Row(
                             modifier = Modifier
@@ -120,7 +124,7 @@ fun AnalyticsScreen(
                             verticalAlignment = Alignment.Bottom
                         ) {
                             analytics.weeklyRevenueTrend.forEach { (day, amount) ->
-                                val barHeightFraction = (amount / maxEarnings).toFloat()
+                                val barHeightFraction = if (amount <= 0.0) 0.05f else ((amount / maxEarnings).toFloat()).coerceIn(0.05f, 1f)
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -158,7 +162,7 @@ fun AnalyticsScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            text = "🔥 Best Selling Dishes This Week",
+                            text = "Best Selling Dishes This Week",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = TextLight

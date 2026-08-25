@@ -13,6 +13,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.RemoveShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -229,7 +230,7 @@ fun RestaurantDetailScreen(
                                     .padding(horizontal = 12.dp, vertical = 8.dp)
                             ) {
                                 Text(
-                                    text = "🎉 $offer",
+                                    text = offer,
                                     color = OfferBlue,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.ExtraBold
@@ -251,7 +252,7 @@ fun RestaurantDetailScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
-                                    text = if (minOrderMet) "✓ Minimum Order Met (₹${minOrder.toInt()})" else "Min Order Requirement: ₹${minOrder.toInt()}",
+                                    text = if (minOrderMet) "Minimum Order Met (₹${minOrder.toInt()})" else "Min Order Requirement: ₹${minOrder.toInt()}",
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.Bold,
                                     color = if (minOrderMet) SecondaryGreen else WarningAmber
@@ -270,6 +271,39 @@ fun RestaurantDetailScreen(
                                     text = "Add items worth ₹${remaining.toInt()} more from ${restaurant.name} to checkout this sub-order.",
                                     fontSize = 11.sp,
                                     color = WarningAmber
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!restaurant.isOpen) {
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        colors = CardDefaults.cardColors(containerColor = NonVegRed.copy(alpha = 0.12f)),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(Icons.Filled.RemoveShoppingCart, contentDescription = null, tint = NonVegRed, modifier = Modifier.size(20.dp))
+                            Column {
+                                Text(
+                                    text = "Currently Closed",
+                                    color = NonVegRed,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 15.sp
+                                )
+                                Text(
+                                    text = "This kitchen is offline and not accepting orders right now.",
+                                    color = TextSecondary,
+                                    fontSize = 12.sp
                                 )
                             }
                         }
@@ -333,10 +367,11 @@ fun RestaurantDetailScreen(
             // Menu Items List
             items(uiState.menuItems) { item ->
                 val qty = uiState.itemQuantities[item.id] ?: 0
+                val effectiveItem = if (!restaurant.isOpen) item.copy(isAvailable = false) else item
                 MenuItemCard(
-                    item = item,
+                    item = effectiveItem,
                     quantity = qty,
-                    onAdd = { viewModel.addToCart(item) },
+                    onAdd = { if (restaurant.isOpen) viewModel.addToCart(item) },
                     onRemove = { viewModel.removeFromCart(item.id) },
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
