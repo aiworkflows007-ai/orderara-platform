@@ -127,7 +127,6 @@ fun OrderTrackingScreen(
                     subOrder = subOrder,
                     onChatClick = { sId, rName -> onNavigateToChat(sId, rName) },
                     onCallClick = { /* launch dialer */ },
-                    onAdvanceStatus = { next -> viewModel.advanceSubOrderStatus(subOrder.subOrderId, next) },
                     onRateClick = { onNavigateToRate(order.id, subOrder.subOrderId) }
                 )
             }

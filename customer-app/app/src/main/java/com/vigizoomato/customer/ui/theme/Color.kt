@@ -42,8 +42,12 @@ val OfferPurpleBg = Color(0xFFF3E8FF)
 val WarningAmber = Color(0xFFD97706)
 val WarningAmberBg = Color(0xFFFEF3C7)
 
-// Gradients for Promo Banners
+// Gradients for Promo Banners.
+// Food-delivery palette: appetizing warm (orange/red) leads, with a single
+// trust-blue as the outlier. Deliberately NO green and NO purple here --
+// green already means "veg" (VegGreen) and "delivered" elsewhere in the app,
+// so a green offer banner reads as a food attribute rather than a discount.
 val PromoGradient1 = Brush.horizontalGradient(listOf(Color(0xFFFF521B), Color(0xFFFF8555)))
-val PromoGradient2 = Brush.horizontalGradient(listOf(Color(0xFF7C3AED), Color(0xFFA855F7)))
-val PromoGradient3 = Brush.horizontalGradient(listOf(Color(0xFF059669), Color(0xFF10B981)))
+val PromoGradient2 = Brush.horizontalGradient(listOf(Color(0xFFC81E3A), Color(0xFFEF4E63)))
+val PromoGradient3 = Brush.horizontalGradient(listOf(Color(0xFFB45309), Color(0xFFF59E0B)))
 val PromoGradient4 = Brush.horizontalGradient(listOf(Color(0xFF0284C7), Color(0xFF38BDF8)))

@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ElectricBolt
 import androidx.compose.material.icons.filled.Star
@@ -20,7 +21,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -114,16 +121,32 @@ fun HomeScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        items(viewModel.cuisines) { (cuisine, icon) ->
+                        items(viewModel.cuisines) { item ->
+                            val cuisine = item.name
                             val isSelected = uiState.selectedCuisine == cuisine || (cuisine == "All" && uiState.selectedCuisine == null)
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(14.dp))
-                                    .clickable { viewModel.selectCuisine(if (cuisine == "All") null else cuisine) }
+                                    // mergeDescendants keeps the photo and label as one
+                                    // node instead of leaking a bare 13dp text node, and
+                                    // contentDescription names the tile. (Modifier order
+                                    // relative to selectable makes no observable difference
+                                    // here -- both were measured on device.)
+                                    .semantics(mergeDescendants = true) {
+                                        contentDescription = cuisine
+                                    }
+                                    .selectable(
+                                        selected = isSelected,
+                                        onClick = { viewModel.selectCuisine(if (cuisine == "All") null else cuisine) },
+                                        role = Role.RadioButton
+                                    )
                                     .padding(2.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
+                                // The ring lives on an outer box so that selecting a
+                                // tile never changes its size -- a border drawn on the
+                                // photo itself would nudge every neighbouring tile.
                                 Box(
                                     modifier = Modifier
                                         .size(62.dp)
@@ -134,10 +157,30 @@ fun HomeScreen(
                                             width = if (isSelected) 2.dp else 1.dp,
                                             color = if (isSelected) PrimaryOrange else BorderLight,
                                             shape = CircleShape
-                                        ),
+                                        )
+                                        .padding(if (isSelected) 2.dp else 1.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(text = icon, fontSize = 28.sp)
+                                    if (item.photoUrl != null) {
+                                        AsyncImage(
+                                            model = item.photoUrl,
+                                            contentDescription = null,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .clip(CircleShape)
+                                                // Neutral fill holds the circle while the
+                                                // photo downloads, so the rail never pops.
+                                                .background(BackgroundLight)
+                                        )
+                                    } else if (item.icon != null) {
+                                        Icon(
+                                            imageVector = item.icon,
+                                            contentDescription = null,
+                                            tint = if (isSelected) PrimaryOrange else TextSecondary,
+                                            modifier = Modifier.size(28.dp)
+                                        )
+                                    }
                                 }
                                 Text(
                                     text = cuisine,
@@ -175,14 +218,30 @@ fun HomeScreen(
                     FilterChip(
                         selected = uiState.sortBy == "Rating",
                         onClick = { viewModel.setSortBy(if (uiState.sortBy == "Rating") "Popular" else "Rating") },
-                        label = { Text("★ 4.0+", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
+                        label = { Text("4.0+", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = null,
+                                tint = GoldStar,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        },
                         shape = RoundedCornerShape(10.dp)
                     )
 
                     FilterChip(
                         selected = uiState.sortBy == "DeliveryTime",
                         onClick = { viewModel.setSortBy(if (uiState.sortBy == "DeliveryTime") "Popular" else "DeliveryTime") },
-                        label = { Text("⚡ Fastest", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
+                        label = { Text("Fastest", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Filled.Bolt,
+                                contentDescription = null,
+                                tint = WarningAmber,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        },
                         shape = RoundedCornerShape(10.dp)
                     )
                 }

@@ -78,6 +78,7 @@ class RestaurantDetailViewModel(
 
     fun loadRestaurant(restaurantId: String) {
         _restaurantId.value = restaurantId
+        restaurantRepository.refreshMenu(restaurantId)
     }
 
     fun selectCategory(category: String?) {

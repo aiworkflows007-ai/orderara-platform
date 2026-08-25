@@ -12,8 +12,10 @@ import {
 
 export default function Sidebar({ activeTab, setActiveTab }) {
   const menuItems = [
-    { id: 'subscriptions', label: 'Subscription & MRR Hub', icon: CreditCard, badge: '₹999/mo', badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' },
-    { id: 'restaurants', label: 'Partner Restaurants', icon: Store, badge: '28' },
+    // Kept short so it fits beside its badge at w-64 without truncating --
+    // the page heading still carries the full "Subscriptions & MRR Management".
+    { id: 'subscriptions', label: 'Subscriptions', icon: CreditCard, badge: '₹999/mo', badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' },
+    { id: 'restaurants', label: 'Partner Restaurants', icon: Store },
     { id: 'overview', label: 'Platform Dashboard', icon: LayoutDashboard },
     { id: 'orders', label: 'Live Orders Pulse', icon: ShoppingBag, badge: 'LIVE', badgeColor: 'bg-orange-500/20 text-orange-400 border border-orange-500/30' },
     { id: 'settings', label: 'Billing & Settings', icon: Sliders },
@@ -57,14 +59,20 @@ export default function Sidebar({ activeTab, setActiveTab }) {
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
             >
-              <div className="flex items-center space-x-3">
-                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                <span>{item.label}</span>
+              <div className="flex items-center space-x-3 min-w-0">
+                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                <span className="truncate" title={item.label}>{item.label}</span>
               </div>
               {item.badge && (
                 <span
-                  className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-                    item.badgeColor || (isActive ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-300')
+                  // The per-item colours (emerald, orange) are tuned for the dark
+                  // slate row. On the active row the background turns orange and
+                  // emerald-on-orange measured 1.65:1, so the active row always
+                  // falls back to white-on-translucent instead.
+                  className={`ml-2 shrink-0 whitespace-nowrap text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                    isActive
+                      ? 'bg-black/25 text-white'
+                      : (item.badgeColor || 'bg-slate-800 text-slate-300')
                   }`}
                 >
                   {item.badge}

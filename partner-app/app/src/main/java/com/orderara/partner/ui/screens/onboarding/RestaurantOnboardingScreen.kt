@@ -483,7 +483,7 @@ fun RestaurantOnboardingScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "⚡ 100% Direct UPI Settlement • 0% Commission",
+                                    text = "100% Direct UPI Settlement • 0% Commission",
                                     color = SuccessEmerald,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
@@ -557,7 +557,7 @@ fun RestaurantOnboardingScreen(
                             shape = RoundedCornerShape(10.dp)
                         ) {
                             Text(
-                                text = "ℹ️ Payouts are transferred automatically to this UPI ID every night without any transaction fees or commission cuts.",
+                                text = "Payouts are transferred automatically to this UPI ID every night without any transaction fees or commission cuts.",
                                 color = TextLightSecondary,
                                 fontSize = 11.sp,
                                 modifier = Modifier.padding(10.dp)
@@ -642,18 +642,31 @@ fun RestaurantOnboardingScreen(
                         ) {
                             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 listOf(
-                                    "✓ 0% Commission on unlimited customer orders",
-                                    "✓ Direct daily instant UPI payouts to ${state.upiId.ifEmpty { "your UPI" }}",
-                                    "✓ Live Kitchen Display System (KDS) & KOT tickets",
-                                    "✓ Instant out-of-stock menu toggles",
-                                    "✓ Direct restaurant-to-customer chat & dispatch"
+                                    "0% Commission on unlimited customer orders",
+                                    "Direct daily instant UPI payouts to ${state.upiId.ifEmpty { "your UPI" }}",
+                                    "Live Kitchen Display System (KDS) & KOT tickets",
+                                    "Instant out-of-stock menu toggles",
+                                    "Direct restaurant-to-customer chat & dispatch"
                                 ).forEach { benefit ->
-                                    Text(
-                                        text = benefit,
-                                        color = TextLight,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.Top,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.CheckCircle,
+                                            contentDescription = null,
+                                            tint = SuccessEmerald,
+                                            modifier = Modifier
+                                                .padding(top = 1.dp)
+                                                .size(13.dp)
+                                        )
+                                        Text(
+                                            text = benefit,
+                                            color = TextLight,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -687,15 +700,30 @@ fun RestaurantOnboardingScreen(
                             viewModel.submitRegistration(onRegistrationComplete)
                         }
                     },
+                    enabled = !state.isSubmitting,
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = PartnerPrimary),
                     modifier = Modifier.weight(2f)
                 ) {
-                    Text(
-                        text = if (state.currentStep < 4) "Continue →" else "🚀 Activate Trial & Launch Store",
-                        fontWeight = FontWeight.Black,
-                        color = Color.White
-                    )
+                    if (state.isSubmitting) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                color = Color.White,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text("Registering…", fontWeight = FontWeight.Black, color = Color.White)
+                        }
+                    } else {
+                        Text(
+                            text = if (state.currentStep < 4) "Continue →" else "Activate Trial & Launch Store",
+                            fontWeight = FontWeight.Black,
+                            color = Color.White
+                        )
+                    }
                 }
             }
         }

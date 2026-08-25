@@ -250,7 +250,7 @@ fun MultiRestaurantCartScreen(
                                             .background(SecondaryGreenLight)
                                             .padding(horizontal = 8.dp, vertical = 4.dp)
                                     ) {
-                                        Text("✓ Met", color = SecondaryGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Text("Met", color = SecondaryGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }

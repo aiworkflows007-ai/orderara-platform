@@ -6,7 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ElectricBolt
 import androidx.compose.material.icons.outlined.Restaurant
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,6 +32,7 @@ import com.orderara.partner.ui.components.OrderCard
 import com.orderara.partner.ui.components.PartnerTopBar
 import com.orderara.partner.ui.theme.*
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PartnerOrdersScreen(
     onNavigateToChat: (String, String) -> Unit,
@@ -39,6 +42,16 @@ fun PartnerOrdersScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     var showRoleDialog by remember { mutableStateOf(false) }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val newOrderAlert by viewModel.newOrderAlert.collectAsState()
+
+    LaunchedEffect(newOrderAlert) {
+        newOrderAlert?.let { subOrderId ->
+            snackbarHostState.showSnackbar("New order received: #$subOrderId")
+            viewModel.consumeNewOrderAlert()
+        }
+    }
 
     if (showRoleDialog) {
         RoleSwitchDialog(
@@ -60,6 +73,7 @@ fun PartnerOrdersScreen(
                 onSwitchRoleClick = { showRoleDialog = true }
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = DarkNavy,
         modifier = modifier
     ) { innerPadding ->
@@ -70,38 +84,36 @@ fun PartnerOrdersScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Filter Pills Bar (All, New, Preparing, Out for Delivery, Delivered)
+            // Filter Pills Bar -- wraps instead of scrolling. A single scrolling row
+            // clipped "Preparing" and "Out for Delivery" off the right edge with no
+            // sign they existed, so a kitchen could not see half its own filters.
             item {
-                LazyRow(
+                FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    item {
-                        FilterChip(
-                            selected = uiState.selectedStatusFilter == null,
-                            onClick = { viewModel.selectFilter(null) },
-                            label = { Text("All Orders", fontWeight = FontWeight.Bold) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                containerColor = SurfaceDark,
-                                labelColor = TextLight,
-                                selectedContainerColor = PartnerPrimary,
-                                selectedLabelColor = SurfaceWhite
-                            ),
-                            shape = RoundedCornerShape(10.dp)
-                        )
-                    }
+                    val chipColors = FilterChipDefaults.filterChipColors(
+                        containerColor = SurfaceDark,
+                        labelColor = TextLight,
+                        selectedContainerColor = PartnerPrimary,
+                        selectedLabelColor = SurfaceWhite
+                    )
 
-                    items(PartnerOrderStatus.values()) { status ->
+                    FilterChip(
+                        selected = uiState.selectedStatusFilter == null,
+                        onClick = { viewModel.selectFilter(null) },
+                        label = { Text("All Orders", fontWeight = FontWeight.Bold) },
+                        colors = chipColors,
+                        shape = RoundedCornerShape(10.dp)
+                    )
+
+                    PartnerOrderStatus.entries.forEach { status ->
                         FilterChip(
                             selected = uiState.selectedStatusFilter == status,
                             onClick = { viewModel.selectFilter(if (uiState.selectedStatusFilter == status) null else status) },
                             label = { Text(status.label, fontWeight = FontWeight.Bold) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                containerColor = SurfaceDark,
-                                labelColor = TextLight,
-                                selectedContainerColor = PartnerPrimary,
-                                selectedLabelColor = SurfaceWhite
-                            ),
+                            colors = chipColors,
                             shape = RoundedCornerShape(10.dp)
                         )
                     }
@@ -127,12 +139,23 @@ fun PartnerOrdersScreen(
                         letterSpacing = 0.5.sp
                     )
 
-                    Text(
-                        text = "⚡ Real-time Dispatch",
-                        color = PartnerPrimary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.Bolt,
+                            contentDescription = null,
+                            tint = PartnerPrimary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "Real-time Dispatch",
+                            color = PartnerPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
 

@@ -133,7 +133,8 @@ fun SubscriptionScreen(
                                     )
                                 }
 
-                                val fraction = subInfo.trialDaysRemaining.toFloat() / subInfo.trialTotalDays.toFloat()
+                                val totalDays = if (subInfo.trialTotalDays <= 0) 14 else subInfo.trialTotalDays
+                                val fraction = (subInfo.trialDaysRemaining.toFloat() / totalDays.toFloat()).coerceIn(0f, 1f)
                                 LinearProgressIndicator(
                                     progress = { fraction },
                                     modifier = Modifier

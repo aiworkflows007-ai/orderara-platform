@@ -98,13 +98,16 @@ class ReviewViewModel(
         val userName = authRepository.currentUser.value?.name ?: "Valued Customer"
         val dishNames = sub.items.map { it.menuItem.name }
 
-        restaurantRepository.addReview(
+        // Posted to the server so the new average shows up in the customer
+        // feed, the restaurant's own analytics and the admin directory.
+        restaurantRepository.submitReview(
             restaurantId = sub.restaurantId,
+            subOrderId = _subOrderId.value,
             customerName = userName,
             rating = _rating.value,
             comment = _comment.value,
             orderedDishes = dishNames
-        )
+        ) { _, _ -> }
 
         orderRepository.rateSubOrder(_orderId.value, _subOrderId.value, _rating.value)
         _isSubmitted.value = true

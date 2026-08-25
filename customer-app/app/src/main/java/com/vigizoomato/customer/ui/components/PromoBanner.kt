@@ -111,13 +111,16 @@ fun PromoBannerCard(
                         )
                     }
 
+                    // Dark scrim, not a white wash: white-on-white@20% over the
+                    // orange gradient measured ~2.7:1. A 30% black scrim puts the
+                    // same label at ~6:1 on every gradient in the deck.
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(SurfaceWhite.copy(alpha = 0.2f))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .background(Color.Black.copy(alpha = 0.30f))
+                            .padding(horizontal = 7.dp, vertical = 3.dp)
                     ) {
-                        Text("LIMITED TIME", color = SurfaceWhite, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold)
+                        Text("LIMITED TIME", color = SurfaceWhite, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
                     }
                 }
 

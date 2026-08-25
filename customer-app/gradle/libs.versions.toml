@@ -10,6 +10,7 @@ lifecycleViewmodel = "2.8.7"
 coroutines = "1.9.0"
 serialization = "1.7.3"
 coil = "2.7.0"
+socketio = "2.1.1"
 junit = "4.13.2"
 extJunit = "1.2.1"
 espressoCore = "3.6.1"
@@ -30,6 +31,7 @@ androidx-navigation-compose = { group = "androidx.navigation", name = "navigatio
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+socketio-client = { group = "io.socket", name = "socket.io-client", version.ref = "socketio" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "extJunit" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }

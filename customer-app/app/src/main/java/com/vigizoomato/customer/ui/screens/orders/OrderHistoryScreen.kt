@@ -69,9 +69,7 @@ fun OrderHistoryScreen(
             ) {
                 items(uiState.orders) { order ->
                     Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onNavigateToTracking(order.id) },
+                        modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
                         colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)

@@ -45,9 +45,15 @@ class ChatViewModel(
         initialValue = ChatUiState()
     )
 
-    fun initialize(subOrderId: String, restaurantName: String) {
+    fun initialize(subOrderId: String, restaurantName: String, orderId: String = "") {
         _subOrderId.value = subOrderId
         _restaurantName.value = restaurantName
+        chatRepository.openThread(orderId, subOrderId, restaurantName)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        chatRepository.closeThread()
     }
 
     fun onInputChanged(text: String) {
@@ -62,24 +68,12 @@ class ChatViewModel(
         val userName = authRepository.currentUser.value?.name ?: "Customer"
 
         chatRepository.sendMessage(
-            orderId = "VZ-ORD-9842",
+            orderId = "",
             subOrderId = sId,
             restaurantName = rName,
             customerName = userName,
             text = text
         )
         _inputText.value = ""
-
-        // Simulate fast automated / staff response
-        viewModelScope.launch {
-            delay(1500)
-            chatRepository.sendMessage(
-                orderId = "VZ-ORD-9842",
-                subOrderId = sId,
-                restaurantName = rName,
-                customerName = "$rName Kitchen Staff",
-                text = "Got your note! Our kitchen staff is taking care of this."
-            )
-        }
     }
 }

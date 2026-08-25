@@ -16,7 +16,14 @@ enum class PartnerOrderStatus(val label: String, val stepIndex: Int) {
     PREPARING("Preparing", 2),
     OUT_FOR_DELIVERY("Out for Delivery", 3),
     DELIVERED("Delivered", 4),
-    REJECTED("Rejected", -1)
+    REJECTED("Rejected", -1),
+    CANCELLED("Cancelled", -1);
+
+    companion object {
+        /** Maps the status string the backend sends onto this enum. */
+        fun fromApi(value: String?): PartnerOrderStatus =
+            entries.firstOrNull { it.name.equals(value, ignoreCase = true) } ?: PLACED
+    }
 }
 
 @Serializable
@@ -34,14 +41,23 @@ data class PartnerMenuItem(
     val preparationTimeMinutes: Int = 20
 )
 
+/**
+ * One line on an incoming order. Kept flat so it maps straight onto the JSON
+ * the backend sends — the dish may have been edited or deleted since the
+ * customer ordered it, so the order stores its own copy of the details.
+ */
 @Serializable
 data class OrderItemRecord(
-    val menuItem: PartnerMenuItem,
+    val menuItemId: String = "",
+    val name: String = "",
+    val price: Double = 0.0,
     val quantity: Int = 1,
+    val isVeg: Boolean = true,
+    val imageUrl: String = "",
     val specialNotes: String = ""
 ) {
     val totalPrice: Double
-        get() = menuItem.price * quantity
+        get() = price * quantity
 }
 
 @Serializable
@@ -56,9 +72,9 @@ data class IncomingSubOrder(
     val deliveryFee: Double,
     val discount: Double = 0.0,
     val status: PartnerOrderStatus = PartnerOrderStatus.PLACED,
-    val orderTime: String = "18:30",
+    val orderTime: String = "",
     val estimatedPrepMinutes: Int = 25,
-    val assignedRiderName: String = "Sunil (Staff Rider)",
+    val assignedRiderName: String = "",
     val specialInstructions: String = "",
     val paymentStatus: String = "PAID (Online UPI)"
 ) {
@@ -68,34 +84,52 @@ data class IncomingSubOrder(
 
 @Serializable
 data class RestaurantProfile(
-    val id: String = "rest_1",
-    val name: String = "Royal Biryani House",
-    val description: String = "Authentic Dum Biryani & Charcoal Kebabs",
-    val phone: String = "+91 98450 11223",
-    val email: String = "owner@royalbiryani.com",
-    val address: String = "Indiranagar 100ft Road, Bangalore",
+    val id: String = "",
+    val name: String = "My Restaurant",
+    val description: String = "",
+    val phone: String = "",
+    val email: String = "",
+    val address: String = "",
     val deliveryRadiusKm: Double = 7.0,
     val minOrderValue: Double = 199.0,
     val isOpen: Boolean = true,
-    val rating: Double = 4.6,
-    val totalOrdersServed: Int = 1420,
-    val upiId: String = "royalbiryani@okhdfcbank",
-    val bankAccount: String = "royalbiryani@okhdfcbank"
+    val rating: Double = 5.0,
+    val totalOrdersServed: Int = 0,
+    val upiId: String = "",
+    val bankAccount: String = "",
+    val cuisineTypes: List<String> = emptyList()
 )
 
 @Serializable
 data class SubscriptionInfo(
+    val restaurantId: String = "",
     val planName: String = "Restaurant Unlimited Partner Plan",
     val priceMonthly: Double = 999.0,
     val isTrialActive: Boolean = true,
-    val trialDaysRemaining: Int = 12,
+    val trialDaysRemaining: Int = 14,
     val trialTotalDays: Int = 14,
-    val nextBillingDate: String = "05 Sept 2026",
+    val daysUntilDue: Int = 14,
+    /** ACTIVE_TRIAL | ACTIVE_PAID | OVERDUE | SUSPENDED */
     val status: String = "ACTIVE_TRIAL",
-    val invoices: List<InvoiceRecord> = listOf(
-        InvoiceRecord("INV-2026-001", "14-Day Free Trial", "₹0.00", "ACTIVE", "22 Aug 2026")
-    )
-)
+    val nextBillingDate: String = "",
+    val graceEndsAt: String? = null,
+    val suspendedReason: String? = null,
+    val invoices: List<InvoiceRecord> = emptyList()
+) {
+    val isSuspended: Boolean get() = status == "SUSPENDED"
+    val isOverdue: Boolean get() = status == "OVERDUE"
+    val isPaid: Boolean get() = status == "ACTIVE_PAID"
+
+    /** Plain-language line shown at the top of the subscription screen. */
+    val headline: String
+        get() = when (status) {
+            "ACTIVE_PAID" -> "Subscription active"
+            "ACTIVE_TRIAL" -> "Free trial — $trialDaysRemaining days left"
+            "OVERDUE" -> "Payment overdue — pay now to stay listed"
+            "SUSPENDED" -> "Listing suspended"
+            else -> status
+        }
+}
 
 @Serializable
 data class InvoiceRecord(
@@ -125,22 +159,11 @@ data class PartnerChatMessage(
 )
 
 data class PartnerDailyAnalytics(
-    val todayRevenue: Double = 4850.0,
-    val todayOrdersCount: Int = 14,
-    val avgPrepTimeMinutes: Int = 21,
-    val topSellingItems: List<Pair<String, Int>> = listOf(
-        "Hyderabadi Chicken Dum Biryani" to 28,
-        "Murgh Tangdi Kebab (4 Pcs)" to 19,
-        "Royal Paneer Tikka Biryani" to 14,
-        "Butter Naan & Dal Makhani Combo" to 11
-    ),
-    val weeklyRevenueTrend: List<Pair<String, Double>> = listOf(
-        "Mon" to 3200.0,
-        "Tue" to 3900.0,
-        "Wed" to 4100.0,
-        "Thu" to 3600.0,
-        "Fri" to 5800.0,
-        "Sat" to 7200.0,
-        "Sun" to 6900.0
-    )
+    val todayRevenue: Double = 0.0,
+    val todayOrdersCount: Int = 0,
+    val lifetimeOrdersCount: Int = 0,
+    val lifetimeRevenue: Double = 0.0,
+    val avgPrepTimeMinutes: Int = 20,
+    val topSellingItems: List<Pair<String, Int>> = emptyList(),
+    val weeklyRevenueTrend: List<Pair<String, Double>> = emptyList()
 )

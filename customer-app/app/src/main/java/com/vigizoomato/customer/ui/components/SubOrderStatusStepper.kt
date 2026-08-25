@@ -12,6 +12,8 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ElectricBolt
 import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -30,7 +32,6 @@ fun SubOrderStatusCard(
     subOrder: SubOrder,
     onChatClick: (String, String) -> Unit,
     onCallClick: (String) -> Unit,
-    onAdvanceStatus: (OrderStatus) -> Unit,
     onRateClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -213,7 +214,7 @@ fun SubOrderStatusCard(
 
                     if (subOrder.status == OrderStatus.OUT_FOR_DELIVERY) {
                         Text(
-                            text = "🚴 ${subOrder.driverName}",
+                            text = subOrder.driverName,
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.ExtraBold,
                             color = PrimaryOrangeDark
@@ -235,7 +236,9 @@ fun SubOrderStatusCard(
                             colors = ButtonDefaults.buttonColors(containerColor = PrimaryOrange),
                             shape = RoundedCornerShape(10.dp)
                         ) {
-                            Text("★ Rate This Restaurant & Food", fontWeight = FontWeight.Bold)
+                            Icon(Icons.Filled.StarBorder, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Rate This Restaurant & Food", fontWeight = FontWeight.Bold)
                         }
                     } else {
                         OutlinedButton(
@@ -244,7 +247,9 @@ fun SubOrderStatusCard(
                             enabled = false,
                             shape = RoundedCornerShape(10.dp)
                         ) {
-                            Text("Rated: ${subOrder.ratingScore} ★", color = SecondaryGreen, fontWeight = FontWeight.Bold)
+                            Text("Rated: ${subOrder.ratingScore}", color = SecondaryGreen, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Icon(Icons.Filled.Star, contentDescription = null, tint = SecondaryGreen, modifier = Modifier.size(13.dp))
                         }
                     }
                 } else {
@@ -272,47 +277,6 @@ fun SubOrderStatusCard(
                 }
             }
 
-            // Interactive Simulator
-            if (subOrder.status != OrderStatus.DELIVERED) {
-                val nextStatus = when (subOrder.status) {
-                    OrderStatus.PLACED -> OrderStatus.ACCEPTED
-                    OrderStatus.ACCEPTED -> OrderStatus.PREPARING
-                    OrderStatus.PREPARING -> OrderStatus.OUT_FOR_DELIVERY
-                    OrderStatus.OUT_FOR_DELIVERY -> OrderStatus.DELIVERED
-                    else -> null
-                }
-                nextStatus?.let { next ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(BorderLight.copy(alpha = 0.7f))
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "⚡ Demo Mode",
-                            fontSize = 11.sp,
-                            color = TextSecondary,
-                            fontWeight = FontWeight.Bold
-                        )
-                        TextButton(
-                            onClick = { onAdvanceStatus(next) },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-                        ) {
-                            Icon(Icons.Outlined.PlayArrow, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "Advance: ${next.label}",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = PrimaryOrange
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 }

@@ -3,13 +3,19 @@ package com.vigizoomato.customer.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -43,7 +49,8 @@ fun MenuItemCard(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(end = 14.dp),
+                    .padding(end = 14.dp)
+                    .alpha(if (item.isAvailable) 1f else 0.55f),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Row(
@@ -59,20 +66,42 @@ fun MenuItemCard(
                                 .background(GoldStar.copy(alpha = 0.18f))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
-                            Text(
-                                text = "★ BESTSELLER",
-                                color = DarkCharcoal,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.ExtraBold
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Icon(
+                                    Icons.Filled.Star,
+                                    contentDescription = null,
+                                    tint = DarkCharcoal,
+                                    modifier = Modifier.size(9.dp)
+                                )
+                                Text(
+                                    text = "BESTSELLER",
+                                    color = DarkCharcoal,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                            }
                         }
                     }
 
                     if (item.spicyLevel > 1) {
-                        Text(
-                            text = "🔥".repeat(item.spicyLevel),
-                            fontSize = 10.sp
-                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(1.dp),
+                            modifier = Modifier.semantics {
+                                contentDescription = "Spice level ${item.spicyLevel} of 3"
+                            }
+                        ) {
+                            repeat(item.spicyLevel) {
+                                Icon(
+                                    Icons.Filled.LocalFireDepartment,
+                                    contentDescription = null,
+                                    tint = NonVegRed,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -125,6 +154,15 @@ fun MenuItemCard(
                         .clip(RoundedCornerShape(14.dp))
                 )
 
+                if (!item.isAvailable) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(DarkCharcoal.copy(alpha = 0.35f))
+                    )
+                }
+
                 // Quantity selector anchored at bottom center of the image
                 Box(
                     modifier = Modifier
@@ -132,11 +170,27 @@ fun MenuItemCard(
                         .wrapContentSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    QuantitySelector(
-                        quantity = quantity,
-                        onAdd = onAdd,
-                        onRemove = onRemove
-                    )
+                    if (item.isAvailable) {
+                        QuantitySelector(
+                            quantity = quantity,
+                            onAdd = onAdd,
+                            onRemove = onRemove
+                        )
+                    } else {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = BorderLight,
+                            shadowElevation = 1.dp
+                        ) {
+                            Text(
+                                text = "OUT OF STOCK",
+                                color = TextSecondary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
                 }
             }
         }

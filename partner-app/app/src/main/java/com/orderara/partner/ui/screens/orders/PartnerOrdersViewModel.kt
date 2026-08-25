@@ -41,6 +41,12 @@ class PartnerOrdersViewModel : ViewModel() {
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), OrdersUiState())
 
+    val newOrderAlert: StateFlow<String?> = orderRepo.newOrderAlert
+
+    fun consumeNewOrderAlert() {
+        orderRepo.consumeNewOrderAlert()
+    }
+
     fun selectFilter(status: PartnerOrderStatus?) {
         _selectedStatusFilter.value = status
     }

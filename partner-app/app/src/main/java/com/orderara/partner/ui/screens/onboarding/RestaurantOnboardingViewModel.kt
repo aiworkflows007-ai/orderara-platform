@@ -94,24 +94,33 @@ class RestaurantOnboardingViewModel : ViewModel() {
         }
     }
 
+    fun dismissError() = _uiState.update { it.copy(errorMessage = null) }
+
+    /**
+     * Registers with the backend and only reports success once the server has
+     * the restaurant. That is the moment it becomes visible in the Customer app
+     * and the Admin panel.
+     */
     fun submitRegistration(onSuccess: () -> Unit) {
         val s = _uiState.value
-        _uiState.update { it.copy(isSubmitting = true) }
+        _uiState.update { it.copy(isSubmitting = true, errorMessage = null) }
 
         val finalUpi = s.upiId.ifEmpty { "${s.phone.replace("+", "").replace(" ", "")}@upi" }
 
         authRepo.registerNewRestaurant(
-            name = s.restaurantName.ifEmpty { "My Gourmet Restaurant" },
-            ownerName = s.ownerName.ifEmpty { "Partner Owner" },
-            phone = s.phone.ifEmpty { "+91 98450 11223" },
-            email = s.email.ifEmpty { "owner@restaurant.com" },
-            address = "${s.address.ifEmpty { "100ft Road, Indiranagar" }}, ${s.city}",
+            name = s.restaurantName.trim().ifEmpty { "My Restaurant" },
+            ownerName = s.ownerName.trim().ifEmpty { "Owner" },
+            phone = s.phone.trim(),
+            email = s.email.trim(),
+            address = "${s.address.trim()}, ${s.city.trim()}",
             cuisines = s.selectedCuisines.toList().ifEmpty { listOf("Multi-Cuisine") },
             deliveryRadiusKm = s.deliveryRadiusKm,
             minOrderValue = s.minOrderValue,
-            upiId = finalUpi
-        )
-
-        onSuccess()
+            upiId = finalUpi,
+            isVegOnly = s.isVegOnly
+        ) { success, message ->
+            _uiState.update { it.copy(isSubmitting = false, errorMessage = if (success) null else message) }
+            if (success) onSuccess()
+        }
     }
 }
