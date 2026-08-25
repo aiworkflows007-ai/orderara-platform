@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.orderara.partner"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.orderara.partner"
@@ -57,6 +57,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.coil.compose)
+    implementation(libs.socketio.client) { exclude(group = "org.json", module = "json") }
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
