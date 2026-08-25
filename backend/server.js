@@ -1,544 +1,875 @@
+/**
+ * OrderAra unified backend.
+ *
+ * One server joins three products:
+ *   - Customer app   (browse, order, track, chat, rate)
+ *   - Partner app    (register, menu, orders, status, subscription)
+ *   - Admin panel    (directory, live orders, subscriptions, suspension)
+ *
+ * State lives in ./store.js and is persisted to data.json.
+ */
+
 const express = require('express');
 const http = require('http');
 const path = require('path');
-const { Server } = require('socket.io');
-const cors = require('cors');
+const fs = require('fs');
 const crypto = require('crypto');
-const uuidv4 = () => crypto.randomUUID();
+const cors = require('cors');
+const { Server } = require('socket.io');
+
+const store = require('./store');
+const { partnerAuth, describeAuthMode } = require('./auth');
+const { state, save, SUB_STATUS, ORDER_STATUS } = store;
+
+const uid = (prefix) => `${prefix}_${crypto.randomUUID().split('-')[0]}`;
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE']
-  }
+  cors: { origin: '*', methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'] }
 });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 
-// Health check for Render
+// Some Android HTTP clients refuse to send PATCH/DELETE. Those requests arrive
+// as POST carrying the real verb in a header — restore it before routing.
+app.use((req, res, next) => {
+  const override = req.headers['x-http-method-override'];
+  if (override && req.method === 'POST') req.method = String(override).toUpperCase();
+  next();
+});
+
+// Partner routes carry the restaurant's identity. This attaches req.auth when a
+// valid Supabase token is present; whether a missing token is fatal is decided
+// by REQUIRE_PARTNER_AUTH so that enforcement can be switched on separately
+// from shipping this code.
+app.use('/api/partner', partnerAuth);
+
+// ---------------------------------------------------------------------------
+// Broadcast helpers — every mutation tells the other two apps about it
+// ---------------------------------------------------------------------------
+
+const roomRestaurant = id => `restaurant:${id}`;
+const roomCustomer = id => `customer:${id}`;
+const roomSubOrder = id => `suborder:${id}`;
+const ROOM_ADMIN = 'admin';
+
+function broadcastRestaurants() {
+  const listed = state.restaurants.filter(store.isListed);
+  io.emit('restaurants:updated', listed);
+  io.to(ROOM_ADMIN).emit('admin:restaurants:updated', state.restaurants);
+}
+
+function findRestaurant(id) {
+  return state.restaurants.find(r => r.id === id);
+}
+
+function findSubOrder(subOrderId) {
+  for (const order of state.orders) {
+    const sub = order.subOrders.find(s => s.subOrderId === subOrderId);
+    if (sub) return { order, sub };
+  }
+  return { order: null, sub: null };
+}
+
+function menuFor(restaurantId) {
+  return state.menuItems.filter(m => m.restaurantId === restaurantId);
+}
+
+// ---------------------------------------------------------------------------
+// Health
+// ---------------------------------------------------------------------------
+
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'OrderAra Backend API', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    service: 'OrderAra Backend API',
+    restaurants: state.restaurants.length,
+    orders: state.orders.length,
+    timestamp: new Date().toISOString()
+  });
 });
 
-// In-Memory Database (Synced State across Customer and Partner Apps)
-let restaurants = [
-  {
-    id: "rest_1",
-    name: "Royal Biryani House",
-    description: "Authentic Dum Biryani, Mughlai Gravies & Charcoal Kebabs",
-    bannerUrl: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800&auto=format&fit=crop&q=80",
-    rating: 4.6,
-    totalRatings: 1420,
-    deliveryTimeMinutes: 25,
-    distanceKm: 2.4,
-    deliveryRadiusKm: 7.0,
-    minOrderValue: 199.0,
-    isVegOnly: false,
-    isPromoted: true,
-    discountOffer: "50% OFF up to ₹100",
-    cuisineTypes: ["Biryani", "Mughlai", "North Indian", "Kebabs"],
-    isOpen: true,
-    phone: "+91 98450 11223",
-    email: "owner@royalbiryani.com",
-    address: "Indiranagar 100ft Road, Bangalore"
-  },
-  {
-    id: "rest_2",
-    name: "Pizza Milano & Crust",
-    description: "Hand-tossed Woodfired Neapolitan Pizzas & Pastas",
-    bannerUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80",
-    rating: 4.5,
-    totalRatings: 980,
-    deliveryTimeMinutes: 20,
-    distanceKm: 1.8,
-    deliveryRadiusKm: 6.0,
-    minOrderValue: 249.0,
-    isVegOnly: false,
-    isPromoted: false,
-    discountOffer: "Flat ₹75 OFF above ₹399",
-    cuisineTypes: ["Pizza", "Italian", "Pastas", "Desserts"],
-    isOpen: true,
-    phone: "+91 98450 22334",
-    email: "manager@pizzamilano.com",
-    address: "12th Main Road, HAL 2nd Stage, Bangalore"
-  },
-  {
-    id: "rest_3",
-    name: "Udupi Sri Krishna Sagar",
-    description: "Authentic South Indian Tiffins, Filter Coffee & Thalis",
-    bannerUrl: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=800&auto=format&fit=crop&q=80",
-    rating: 4.7,
-    totalRatings: 3100,
-    deliveryTimeMinutes: 18,
-    distanceKm: 1.2,
-    deliveryRadiusKm: 5.0,
-    minOrderValue: 120.0,
-    isVegOnly: true,
-    isPromoted: false,
-    discountOffer: "20% OFF above ₹150",
-    cuisineTypes: ["South Indian", "Pure Veg", "Breakfast", "Thali"],
-    isOpen: true,
-    phone: "+91 98450 33445",
-    email: "contact@udupisagar.com",
-    address: "CMH Road, Indiranagar, Bangalore"
-  },
-  {
-    id: "rest_4",
-    name: "The Burger Garage",
-    description: "Smash Burgers, Loaded Fries & Thick Shakes",
-    bannerUrl: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format&fit=crop&q=80",
-    rating: 4.4,
-    totalRatings: 850,
-    deliveryTimeMinutes: 22,
-    distanceKm: 3.1,
-    deliveryRadiusKm: 8.0,
-    minOrderValue: 180.0,
-    isVegOnly: false,
-    isPromoted: true,
-    discountOffer: "Free Fries with any Burger",
-    cuisineTypes: ["Burgers", "Fast Food", "Fries", "Shakes"],
-    isOpen: true,
-    phone: "+91 98450 44556",
-    email: "hello@burgergarage.com",
-    address: "80ft Road, Koramangala 4th Block, Bangalore"
-  }
-];
+// ---------------------------------------------------------------------------
+// Customer — discovery
+// ---------------------------------------------------------------------------
 
-let menuItems = [
-  {
-    id: "menu_1",
-    restaurantId: "rest_1",
-    name: "Hyderabadi Chicken Dum Biryani",
-    description: "Slow cooked fragrant basmati rice layered with spiced chicken, caramelized onions & fresh herbs.",
-    price: 320.0,
-    category: "Biryani Specials",
-    imageUrl: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800&auto=format&fit=crop&q=80",
-    isVeg: false,
-    isAvailable: true,
-    isBestSeller: true,
-    spicyLevel: 2
-  },
-  {
-    id: "menu_2",
-    restaurantId: "rest_1",
-    name: "Royal Paneer Tikka Biryani",
-    description: "Cottage cheese cubes marinated in tandoori spices, layered over aromatic saffron basmati rice.",
-    price: 280.0,
-    category: "Biryani Specials",
-    imageUrl: "https://images.unsplash.com/photo-1633945274405-b6c8069047b0?w=800&auto=format&fit=crop&q=80",
-    isVeg: true,
-    isAvailable: true,
-    isBestSeller: true,
-    spicyLevel: 1
-  },
-  {
-    id: "menu_3",
-    restaurantId: "rest_1",
-    name: "Murgh Tangdi Kebab (4 Pcs)",
-    description: "Juicy chicken drumsticks marinated in rich cashew paste and tandoori spices, roasted in clay oven.",
-    price: 290.0,
-    category: "Starters & Kebabs",
-    imageUrl: "https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?w=800&auto=format&fit=crop&q=80",
-    isVeg: false,
-    isAvailable: true,
-    isBestSeller: false,
-    spicyLevel: 2
-  },
-  {
-    id: "menu_4",
-    restaurantId: "rest_1",
-    name: "Butter Garlic Naan & Dal Makhani Combo",
-    description: "2 fluffy butter garlic naans served with slow simmered creamy black lentil dal makhani.",
-    price: 220.0,
-    category: "Mains & Breads",
-    imageUrl: "https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=800&auto=format&fit=crop&q=80",
-    isVeg: true,
-    isAvailable: true,
-    isBestSeller: false,
-    spicyLevel: 0
-  },
-  {
-    id: "menu_5",
-    restaurantId: "rest_1",
-    name: "Shahi Gulab Jamun with Rabri",
-    description: "Warm golden khoya dumplings served in fragrant cardamom saffron syrup with chilled rabri.",
-    price: 140.0,
-    category: "Desserts",
-    imageUrl: "https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=800&auto=format&fit=crop&q=80",
-    isVeg: true,
-    isAvailable: true,
-    isBestSeller: false,
-    spicyLevel: 0
-  }
-];
-
-let orders = [
-  {
-    orderId: "VZ-ORD-9842",
-    userId: "user_101",
-    userName: "Ashok Sharma",
-    userPhone: "+91 98765 43210",
-    deliveryAddress: "Flat 402, Sunshine Heights, 12th Main Road, Indiranagar",
-    totalPaid: 773.0,
-    paymentMethod: "UPI (Google Pay)",
-    createdAt: new Date(Date.now() - 15 * 60000).toISOString(),
-    subOrders: [
-      {
-        subOrderId: "SUB-01",
-        restaurantId: "rest_1",
-        restaurantName: "Royal Biryani House",
-        restaurantPhone: "+91 98450 11223",
-        status: "PREPARING",
-        estimatedDeliveryMinutes: 20,
-        driverName: "Ramesh (Staff)",
-        driverPhone: "+91 98450 44556",
-        items: [
-          { menuItem: menuItems[0], quantity: 1, totalPrice: 320.0 },
-          { menuItem: menuItems[2], quantity: 1, totalPrice: 290.0 }
-        ],
-        subTotal: 610.0,
-        deliveryFee: 35.0,
-        discount: 100.0,
-        specialInstructions: "Please pack extra tissues and lime slices."
-      }
-    ]
-  }
-];
-
-let chatMessages = [
-  {
-    id: "msg_1",
-    subOrderId: "SUB-01",
-    senderName: "Ashok Sharma",
-    isFromCustomer: true,
-    text: "Hi! Could you please ensure the biryani is freshly hot and spicy?",
-    timestamp: "18:26"
-  },
-  {
-    id: "msg_2",
-    subOrderId: "SUB-01",
-    senderName: "Chef Imran (Kitchen)",
-    isFromCustomer: false,
-    text: "Sure sir! Our chef is preparing your Hyderabadi Dum Biryani with extra spices.",
-    timestamp: "18:27"
-  }
-];
-
-// --- REST API ENDPOINTS ---
-
-// 1. Get All Restaurants (for Customer Explore Feed)
+// Only restaurants with a live subscription are visible to customers.
 app.get('/api/restaurants', (req, res) => {
-  res.json({ success: true, data: restaurants });
+  res.json({ success: true, data: state.restaurants.filter(store.isListed) });
 });
 
-// 1b. Register New Restaurant (from Partner App -> Syncs across all Customer Apps & Web Portal)
+app.get('/api/restaurants/:id', (req, res) => {
+  const rest = findRestaurant(req.params.id);
+  if (!rest) return res.status(404).json({ success: false, message: 'Restaurant not found' });
+  res.json({
+    success: true,
+    data: {
+      restaurant: rest,
+      menuItems: menuFor(rest.id),
+      reviews: state.reviews.filter(r => r.restaurantId === rest.id)
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Partner — registration and profile
+// ---------------------------------------------------------------------------
+
+const BANNERS = [
+  'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1552566626-52f8b828add9?w=800&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=800&auto=format&fit=crop&q=80'
+];
+
+/**
+ * Resolves the signed-in account to its restaurant.
+ *
+ * The Partner app calls this on launch: 200 means "go to the dashboard",
+ * 404 means "this account has no restaurant yet, show onboarding".
+ */
+app.get('/api/partner/me', (req, res) => {
+  if (!req.auth) {
+    return res.status(401).json({ success: false, message: 'Sign-in required' });
+  }
+  const mine = state.restaurants.find(r => r.ownerAuthSub === req.auth.sub);
+  if (!mine) {
+    return res.status(404).json({
+      success: false,
+      message: 'No restaurant linked to this account',
+      account: { email: req.auth.email }
+    });
+  }
+  return res.json({ success: true, data: mine });
+});
+
+/**
+ * Attaches an existing, unclaimed restaurant to the signed-in account.
+ *
+ * Needed because the seeded demo restaurants predate sign-in and have no owner.
+ * Deliberately refuses to touch one that is already claimed, so this cannot be
+ * used to take over somebody else's shop.
+ */
+app.post('/api/partner/claim', (req, res) => {
+  if (!req.auth) {
+    return res.status(401).json({ success: false, message: 'Sign-in required' });
+  }
+  const { restaurantId } = req.body || {};
+  const rest = findRestaurant(restaurantId);
+  if (!rest) {
+    return res.status(404).json({ success: false, message: 'Restaurant not found' });
+  }
+  if (rest.ownerAuthSub && rest.ownerAuthSub !== req.auth.sub) {
+    return res.status(409).json({ success: false, message: 'Already claimed by another account' });
+  }
+  rest.ownerAuthSub = req.auth.sub;
+  rest.ownerEmail = req.auth.email || rest.ownerEmail || '';
+  save();
+  return res.json({ success: true, data: rest });
+});
+
 app.post('/api/partner/register', (req, res) => {
   const {
-    id,
-    name,
-    description,
-    phone,
-    email,
-    address,
-    deliveryRadiusKm,
-    minOrderValue,
-    isVegOnly,
-    cuisineTypes,
-    upiId
+    id, name, ownerName, description, phone, email, address,
+    deliveryRadiusKm, minOrderValue, isVegOnly, cuisineTypes, upiId
   } = req.body;
 
-  const restId = id || `rest_${Date.now()}`;
-  const bannerImages = [
-    "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=80",
-    "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80",
-    "https://images.unsplash.com/photo-1552566626-52f8b828add9?w=800&auto=format&fit=crop&q=80",
-    "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=800&auto=format&fit=crop&q=80"
-  ];
-  const chosenBanner = bannerImages[Math.floor(Math.random() * bannerImages.length)];
+  const restId = id || uid('rest');
+  if (findRestaurant(restId)) {
+    return res.status(409).json({ success: false, message: 'Restaurant already registered' });
+  }
 
-  const newRestaurant = {
+  const cuisines = Array.isArray(cuisineTypes) && cuisineTypes.length ? cuisineTypes : ['Multi-Cuisine'];
+
+  const newRestaurant = store.withSubscriptionDefaults({
     id: restId,
-    name: name || "New Restaurant",
-    description: description || (Array.isArray(cuisineTypes) ? cuisineTypes.join(', ') : "Authentic Delicacies & Fresh Cuisine"),
-    bannerUrl: chosenBanner,
+    name: name || 'New Restaurant',
+    ownerName: ownerName || '',
+    description: description || cuisines.join(', '),
+    bannerUrl: BANNERS[Math.floor(Math.random() * BANNERS.length)],
     rating: 5.0,
-    totalRatings: 1,
+    totalRatings: 0,
+    ratingSum: 0,
     deliveryTimeMinutes: 25,
     distanceKm: 2.1,
     deliveryRadiusKm: Number(deliveryRadiusKm) || 7.0,
     minOrderValue: Number(minOrderValue) || 199.0,
     isVegOnly: !!isVegOnly,
     isPromoted: true,
-    discountOffer: "Flat ₹50 OFF",
-    cuisineTypes: Array.isArray(cuisineTypes) && cuisineTypes.length ? cuisineTypes : ["Multi-Cuisine"],
+    discountOffer: 'Flat ₹50 OFF',
+    cuisineTypes: cuisines,
     isOpen: true,
-    phone: phone || "",
-    email: email || "",
-    address: address || "",
-    upiId: upiId || "pay@upi"
-  };
+    phone: phone || '',
+    email: email || '',
+    address: address || '',
+    upiId: upiId || 'pay@upi',
+    // Who owns this restaurant, as far as Supabase is concerned. Set only when
+    // the caller arrived with a verified token; stays empty for the seeded demo
+    // restaurants, which is what lets them be claimed later.
+    ownerAuthSub: (req.auth && req.auth.sub) || '',
+    ownerEmail: (req.auth && req.auth.email) || email || '',
+    subscriptionStatus: SUB_STATUS.TRIAL,
+    joinedAt: new Date().toISOString()
+  });
 
-  // Add starter menu items
   const starterItems = [
     {
-      id: `menu_${restId}_1`,
+      id: `item_${restId}_1`,
       restaurantId: restId,
       name: `Signature ${newRestaurant.name} Special`,
-      description: "Chef's recommended gourmet special recipe prepared fresh with finest ingredients",
-      price: 260.0,
-      category: "Bestsellers",
-      imageUrl: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80",
+      description: "Chef's recommended special, prepared fresh with the finest ingredients.",
+      price: 260,
+      category: 'Bestsellers',
+      imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80',
       isVeg: !!isVegOnly,
       isAvailable: true,
       isBestSeller: true,
-      spicyLevel: 1
+      spicyLevel: 1,
+      preparationTimeMinutes: 20
     },
     {
-      id: `menu_${restId}_2`,
+      id: `item_${restId}_2`,
       restaurantId: restId,
-      name: "Crispy Starter Delight",
-      description: "Crunchy appetizing platter served with artisanal dips and garnish",
-      price: 180.0,
-      category: "Starters",
-      imageUrl: "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=800&auto=format&fit=crop&q=80",
+      name: 'Crispy Starter Delight',
+      description: 'Crunchy appetizing platter served with house dips and garnish.',
+      price: 180,
+      category: 'Starters',
+      imageUrl: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=500&auto=format&fit=crop&q=80',
       isVeg: true,
       isAvailable: true,
       isBestSeller: false,
-      spicyLevel: 1
+      spicyLevel: 1,
+      preparationTimeMinutes: 15
     }
   ];
 
-  menuItems.push(...starterItems);
-  restaurants.unshift(newRestaurant);
+  state.menuItems.push(...starterItems);
+  state.restaurants.unshift(newRestaurant);
+  save();
 
-  // Broadcast to all active customer apps and admin web portals
   io.emit('restaurant:new', newRestaurant);
-  io.emit('restaurants:updated', restaurants);
+  broadcastRestaurants();
 
-  console.log(`[API] New Restaurant Registered: ${newRestaurant.name} (ID: ${newRestaurant.id})`);
-  res.status(201).json({ success: true, data: newRestaurant, menuItems: starterItems });
+  console.log(`[api] restaurant registered: ${newRestaurant.name} (${newRestaurant.id})`);
+  res.status(201).json({
+    success: true,
+    data: newRestaurant,
+    menuItems: starterItems,
+    subscription: store.subscriptionView(newRestaurant)
+  });
 });
 
-app.post('/api/restaurants', (req, res) => {
-  // Alias for /api/partner/register
-  req.url = '/api/partner/register';
-  return app._router.handle(req, res);
-});
-
-// 2. Get Single Restaurant Detail with Menu
-app.get('/api/restaurants/:id', (req, res) => {
-  const rest = restaurants.find(r => r.id === req.params.id);
+// The Partner app calls this on every launch so it shows its OWN restaurant,
+// menu, orders and subscription rather than built-in demo data.
+app.get('/api/partner/profile/:id', (req, res) => {
+  const rest = findRestaurant(req.params.id);
   if (!rest) return res.status(404).json({ success: false, message: 'Restaurant not found' });
-  const items = menuItems.filter(m => m.restaurantId === req.params.id);
-  res.json({ success: true, data: { restaurant: rest, menuItems: items } });
+  res.json({
+    success: true,
+    data: {
+      restaurant: rest,
+      menuItems: menuFor(rest.id),
+      subscription: store.subscriptionView(rest),
+      orders: state.orders
+        .flatMap(o => o.subOrders.map(s => ({ ...s, parentOrderId: o.orderId, customerName: o.userName, customerPhone: o.userPhone, deliveryAddress: o.deliveryAddress, paymentMethod: o.paymentMethod, createdAt: o.createdAt })))
+        .filter(s => s.restaurantId === rest.id)
+    }
+  });
 });
 
-// 3. Toggle Stock Availability (from Partner App -> reflects immediately in Customer App)
-app.patch('/api/partner/menu/:itemId/toggle-stock', (req, res) => {
-  const item = menuItems.find(m => m.id === req.params.itemId);
-  if (!item) return res.status(404).json({ success: false, message: 'Menu item not found' });
-  
-  item.isAvailable = !item.isAvailable;
-  
-  // Real-time broadcast to all customer apps
-  io.emit('menu_item_stock_updated', { itemId: item.id, isAvailable: item.isAvailable, restaurantId: item.restaurantId });
-  
-  res.json({ success: true, data: item });
+// ---------------------------------------------------------------------------
+// Partner — menu management
+// ---------------------------------------------------------------------------
+
+app.get('/api/partner/menu/:restaurantId', (req, res) => {
+  res.json({ success: true, data: menuFor(req.params.restaurantId) });
 });
 
-// 4. Add or Update Menu Item (from Partner App)
 app.post('/api/partner/menu', (req, res) => {
-  const { restaurantId, name, description, price, category, imageUrl, isVeg } = req.body;
+  const { restaurantId, name, description, price, category, imageUrl, isVeg, spicyLevel, preparationTimeMinutes } = req.body;
+  if (!restaurantId || !findRestaurant(restaurantId)) {
+    return res.status(400).json({ success: false, message: 'A valid restaurantId is required' });
+  }
+  if (!name || price === undefined) {
+    return res.status(400).json({ success: false, message: 'name and price are required' });
+  }
+
   const newItem = {
-    id: `menu_${uuidv4().substring(0, 8)}`,
-    restaurantId: restaurantId || "rest_1",
+    id: uid('item'),
+    restaurantId,
     name,
-    description: description || "",
+    description: description || '',
     price: Number(price),
-    category: category || "Specials",
-    imageUrl: imageUrl || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80",
+    category: category || 'Specials',
+    imageUrl: imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80',
     isVeg: Boolean(isVeg),
     isAvailable: true,
     isBestSeller: false,
-    spicyLevel: 1
+    spicyLevel: Number(spicyLevel) || 1,
+    preparationTimeMinutes: Number(preparationTimeMinutes) || 20
   };
-  menuItems.push(newItem);
-  io.emit('menu_updated', { restaurantId: newItem.restaurantId });
-  res.json({ success: true, data: newItem });
+
+  state.menuItems.push(newItem);
+  save();
+
+  io.emit('menu:updated', { restaurantId, item: newItem, action: 'added' });
+  res.status(201).json({ success: true, data: newItem });
 });
 
-// 5. Update Store Settings (Radius, Min Order, Open/Closed)
+app.patch('/api/partner/menu/:itemId', (req, res) => {
+  const item = state.menuItems.find(m => m.id === req.params.itemId);
+  if (!item) return res.status(404).json({ success: false, message: 'Menu item not found' });
+
+  const editable = ['name', 'description', 'category', 'imageUrl'];
+  editable.forEach(k => { if (req.body[k] !== undefined) item[k] = req.body[k]; });
+  if (req.body.price !== undefined) item.price = Number(req.body.price);
+  if (req.body.isVeg !== undefined) item.isVeg = Boolean(req.body.isVeg);
+  if (req.body.isAvailable !== undefined) item.isAvailable = Boolean(req.body.isAvailable);
+  if (req.body.isBestSeller !== undefined) item.isBestSeller = Boolean(req.body.isBestSeller);
+  if (req.body.spicyLevel !== undefined) item.spicyLevel = Number(req.body.spicyLevel);
+  if (req.body.preparationTimeMinutes !== undefined) item.preparationTimeMinutes = Number(req.body.preparationTimeMinutes);
+  save();
+
+  io.emit('menu:updated', { restaurantId: item.restaurantId, item, action: 'updated' });
+  res.json({ success: true, data: item });
+});
+
+app.patch('/api/partner/menu/:itemId/toggle-stock', (req, res) => {
+  const item = state.menuItems.find(m => m.id === req.params.itemId);
+  if (!item) return res.status(404).json({ success: false, message: 'Menu item not found' });
+
+  item.isAvailable = req.body && req.body.isAvailable !== undefined
+    ? Boolean(req.body.isAvailable)
+    : !item.isAvailable;
+  save();
+
+  io.emit('menu:stock', { itemId: item.id, restaurantId: item.restaurantId, isAvailable: item.isAvailable });
+  io.emit('menu:updated', { restaurantId: item.restaurantId, item, action: 'stock' });
+  res.json({ success: true, data: item });
+});
+
+app.delete('/api/partner/menu/:itemId', (req, res) => {
+  const idx = state.menuItems.findIndex(m => m.id === req.params.itemId);
+  if (idx < 0) return res.status(404).json({ success: false, message: 'Menu item not found' });
+
+  const [removed] = state.menuItems.splice(idx, 1);
+  save();
+
+  io.emit('menu:updated', { restaurantId: removed.restaurantId, item: removed, action: 'deleted' });
+  res.json({ success: true, data: removed });
+});
+
+// ---------------------------------------------------------------------------
+// Partner — store settings
+// ---------------------------------------------------------------------------
+
 app.patch('/api/partner/restaurant/:id/settings', (req, res) => {
-  const rest = restaurants.find(r => r.id === req.params.id);
+  const rest = findRestaurant(req.params.id);
   if (!rest) return res.status(404).json({ success: false, message: 'Restaurant not found' });
 
-  const { deliveryRadiusKm, minOrderValue, isOpen } = req.body;
+  const { deliveryRadiusKm, minOrderValue, isOpen, name, description, phone, address, upiId, discountOffer } = req.body;
   if (deliveryRadiusKm !== undefined) rest.deliveryRadiusKm = Number(deliveryRadiusKm);
   if (minOrderValue !== undefined) rest.minOrderValue = Number(minOrderValue);
   if (isOpen !== undefined) rest.isOpen = Boolean(isOpen);
+  if (name) rest.name = name;
+  if (description) rest.description = description;
+  if (phone) rest.phone = phone;
+  if (address) rest.address = address;
+  if (upiId) rest.upiId = upiId;
+  if (discountOffer) rest.discountOffer = discountOffer;
+  save();
 
-  // Broadcast to customer apps
-  io.emit('restaurant_settings_updated', rest);
+  io.emit('restaurant:settings', rest);
+  broadcastRestaurants();
   res.json({ success: true, data: rest });
 });
 
-// 6. Create Multi-Restaurant Order (from Customer App -> splits into Sub-Orders -> rings Partner App)
+// ---------------------------------------------------------------------------
+// Orders
+// ---------------------------------------------------------------------------
+
+function normaliseItem(raw) {
+  const src = raw.menuItem || raw;
+  const quantity = Number(raw.quantity) || 1;
+  const price = Number(src.price) || 0;
+  return {
+    menuItemId: src.id || src.menuItemId || '',
+    name: src.name || 'Item',
+    description: src.description || '',
+    imageUrl: src.imageUrl || '',
+    isVeg: Boolean(src.isVeg),
+    price,
+    quantity,
+    totalPrice: raw.totalPrice !== undefined ? Number(raw.totalPrice) : price * quantity,
+    specialNotes: raw.specialNotes || ''
+  };
+}
+
 app.post('/api/orders', (req, res) => {
-  const { userId, userName, userPhone, deliveryAddress, paymentMethod, subOrders } = req.body;
-  const orderId = `VZ-ORD-${Math.floor(1000 + Math.random() * 9000)}`;
+  const { userId, userName, userPhone, deliveryAddress, paymentMethod, deliveryInstructions, subOrders } = req.body;
 
-  const createdSubOrders = subOrders.map((so, idx) => ({
-    subOrderId: `SUB-0${idx + 1}`,
-    restaurantId: so.restaurantId,
-    restaurantName: so.restaurantName,
-    restaurantPhone: "+91 98450 11223",
-    status: "PLACED",
-    estimatedDeliveryMinutes: 25,
-    driverName: "Pending Assignment",
-    driverPhone: "",
-    items: so.items,
-    subTotal: so.subTotal,
-    deliveryFee: so.deliveryFee,
-    discount: so.discount || 0,
-    specialInstructions: so.specialInstructions || ""
-  }));
+  if (!Array.isArray(subOrders) || subOrders.length === 0) {
+    return res.status(400).json({ success: false, message: 'Order must contain at least one sub-order' });
+  }
 
-  const totalPaid = createdSubOrders.reduce((sum, so) => sum + so.subTotal + so.deliveryFee - so.discount, 0);
+  // Validate every restaurant BEFORE creating anything, so a rejected cart
+  // never leaves half an order behind.
+  for (const so of subOrders) {
+    const rest = findRestaurant(so.restaurantId);
+    if (!rest) {
+      return res.status(404).json({ success: false, message: `Restaurant ${so.restaurantId} no longer exists` });
+    }
+    if (!store.isListed(rest)) {
+      return res.status(409).json({ success: false, message: `${rest.name} is currently unavailable (subscription suspended)` });
+    }
+    if (!rest.isOpen) {
+      return res.status(409).json({ success: false, message: `${rest.name} is closed right now` });
+    }
+    const subTotal = Number(so.subTotal) || 0;
+    if (subTotal < rest.minOrderValue) {
+      return res.status(409).json({
+        success: false,
+        message: `${rest.name} has a minimum order of ₹${rest.minOrderValue}. Add ₹${(rest.minOrderValue - subTotal).toFixed(0)} more.`
+      });
+    }
+  }
+
+  const orderId = store.nextOrderId();
+  const createdAt = new Date().toISOString();
+
+  const createdSubOrders = subOrders.map((so, idx) => {
+    const rest = findRestaurant(so.restaurantId);
+    return {
+      // Globally unique: derived from the order id, so two customers ordering
+      // at the same moment can never share a sub-order id.
+      subOrderId: `${orderId}-S${idx + 1}`,
+      parentOrderId: orderId,
+      restaurantId: rest.id,
+      restaurantName: rest.name,
+      restaurantPhone: rest.phone,
+      status: 'PLACED',
+      statusHistory: [{ status: 'PLACED', at: createdAt, note: `Order sent to ${rest.name}` }],
+      estimatedDeliveryMinutes: rest.deliveryTimeMinutes || 25,
+      estimatedPrepMinutes: 20,
+      driverName: 'Pending assignment',
+      driverPhone: '',
+      items: (so.items || []).map(normaliseItem),
+      subTotal: Number(so.subTotal) || 0,
+      deliveryFee: Number(so.deliveryFee) || 0,
+      discount: Number(so.discount) || 0,
+      specialInstructions: so.specialInstructions || '',
+      isRated: false,
+      ratingScore: 0
+    };
+  });
+
+  const itemsTotal = createdSubOrders.reduce((s, so) => s + so.subTotal, 0);
+  const totalDeliveryFee = createdSubOrders.reduce((s, so) => s + so.deliveryFee, 0);
+  const totalDiscount = createdSubOrders.reduce((s, so) => s + so.discount, 0);
+  const taxesAndFees = req.body.taxesAndFees !== undefined
+    ? Number(req.body.taxesAndFees)
+    : Number((itemsTotal * 0.05 + createdSubOrders.length * 15).toFixed(2));
 
   const newOrder = {
     orderId,
-    userId: userId || "user_101",
-    userName: userName || "Ashok Sharma",
-    userPhone: userPhone || "+91 98765 43210",
-    deliveryAddress: deliveryAddress || "Indiranagar, Bangalore",
-    totalPaid,
-    paymentMethod: paymentMethod || "Online UPI",
-    createdAt: new Date().toISOString(),
+    userId: userId || 'user_101',
+    userName: userName || 'Customer',
+    userPhone: userPhone || '',
+    deliveryAddress: deliveryAddress || '',
+    deliveryInstructions: deliveryInstructions || '',
+    paymentMethod: paymentMethod || 'Online UPI',
+    paymentStatus: 'PAID',
+    transactionId: `TXN-${crypto.randomUUID().split('-')[0].toUpperCase()}`,
+    itemsTotal,
+    totalDeliveryFee,
+    taxesAndFees,
+    totalDiscount,
+    totalPaid: Number((itemsTotal + totalDeliveryFee + taxesAndFees - totalDiscount).toFixed(2)),
+    createdAt,
     subOrders: createdSubOrders
   };
 
-  orders.unshift(newOrder);
+  state.orders.unshift(newOrder);
+  save();
 
-  // Emit real-time notification to Partner Apps for each sub-order
+  // Ring only the restaurant that owns each sub-order, plus the admin monitor.
   createdSubOrders.forEach(so => {
-    io.emit(`new_sub_order_${so.restaurantId}`, {
+    const payload = {
       orderId,
       subOrder: so,
       customerName: newOrder.userName,
       customerPhone: newOrder.userPhone,
-      deliveryAddress: newOrder.deliveryAddress
-    });
+      deliveryAddress: newOrder.deliveryAddress,
+      paymentMethod: newOrder.paymentMethod,
+      createdAt
+    };
+    io.to(roomRestaurant(so.restaurantId)).emit('order:new', payload);
+    io.to(ROOM_ADMIN).emit('order:new', payload);
   });
 
-  res.json({ success: true, data: newOrder });
+  console.log(`[api] order ${orderId} placed — ${createdSubOrders.length} sub-order(s)`);
+  res.status(201).json({ success: true, data: newOrder });
 });
 
-// 7. Update Sub-Order Status (from Partner App -> triggers instant live stepper update on Customer App)
+app.get('/api/orders', (req, res) => {
+  res.json({ success: true, data: state.orders });
+});
+
+app.get('/api/orders/customer/:userId', (req, res) => {
+  res.json({ success: true, data: state.orders.filter(o => o.userId === req.params.userId) });
+});
+
+app.get('/api/orders/:orderId', (req, res) => {
+  const order = state.orders.find(o => o.orderId === req.params.orderId);
+  if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+  res.json({ success: true, data: order });
+});
+
+// Every sub-order for one restaurant — the Partner order dashboard.
+app.get('/api/partner/orders/:restaurantId', (req, res) => {
+  const rows = state.orders.flatMap(o =>
+    o.subOrders
+      .filter(s => s.restaurantId === req.params.restaurantId)
+      .map(s => ({
+        ...s,
+        parentOrderId: o.orderId,
+        customerName: o.userName,
+        customerPhone: o.userPhone,
+        deliveryAddress: o.deliveryAddress,
+        paymentMethod: o.paymentMethod,
+        paymentStatus: o.paymentStatus,
+        createdAt: o.createdAt
+      }))
+  );
+  res.json({ success: true, data: rows });
+});
+
 app.patch('/api/orders/sub-order/:subOrderId/status', (req, res) => {
-  const { subOrderId } = req.params;
-  const { status, driverName, estimatedDeliveryMinutes } = req.body;
-
-  let matchedSubOrder = null;
-  let parentOrderId = null;
-
-  for (const order of orders) {
-    const found = order.subOrders.find(so => so.subOrderId === subOrderId);
-    if (found) {
-      found.status = status;
-      if (driverName) found.driverName = driverName;
-      if (estimatedDeliveryMinutes) found.estimatedDeliveryMinutes = estimatedDeliveryMinutes;
-      matchedSubOrder = found;
-      parentOrderId = order.orderId;
-      break;
-    }
+  const { status, driverName, driverPhone, estimatedPrepMinutes, estimatedDeliveryMinutes, note } = req.body;
+  if (!ORDER_STATUS.includes(status)) {
+    return res.status(400).json({ success: false, message: `status must be one of ${ORDER_STATUS.join(', ')}` });
   }
 
-  if (!matchedSubOrder) {
-    return res.status(404).json({ success: false, message: 'Sub-Order not found' });
-  }
+  const { order, sub } = findSubOrder(req.params.subOrderId);
+  if (!sub) return res.status(404).json({ success: false, message: 'Sub-order not found' });
 
-  // Real-time broadcast to Customer App
-  io.emit('sub_order_status_updated', {
-    orderId: parentOrderId,
-    subOrderId,
-    status: matchedSubOrder.status,
-    driverName: matchedSubOrder.driverName,
-    estimatedDeliveryMinutes: matchedSubOrder.estimatedDeliveryMinutes
-  });
+  sub.status = status;
+  sub.statusHistory = [...(sub.statusHistory || []), { status, at: new Date().toISOString(), note: note || `Status updated to ${status}` }];
+  if (driverName) sub.driverName = driverName;
+  if (driverPhone) sub.driverPhone = driverPhone;
+  if (estimatedPrepMinutes) sub.estimatedPrepMinutes = Number(estimatedPrepMinutes);
+  if (estimatedDeliveryMinutes) sub.estimatedDeliveryMinutes = Number(estimatedDeliveryMinutes);
+  save();
 
-  res.json({ success: true, data: matchedSubOrder });
+  const payload = {
+    orderId: order.orderId,
+    subOrderId: sub.subOrderId,
+    restaurantId: sub.restaurantId,
+    status: sub.status,
+    statusHistory: sub.statusHistory,
+    driverName: sub.driverName,
+    estimatedDeliveryMinutes: sub.estimatedDeliveryMinutes
+  };
+  io.to(roomCustomer(order.userId)).emit('order:status', payload);
+  io.to(roomRestaurant(sub.restaurantId)).emit('order:status', payload);
+  io.to(ROOM_ADMIN).emit('order:status', payload);
+
+  res.json({ success: true, data: sub });
 });
 
-// 8. In-App Chat Endpoint (Instant bidirectional sync)
+// ---------------------------------------------------------------------------
+// Chat (per sub-order, both directions)
+// ---------------------------------------------------------------------------
+
 app.get('/api/chat/:subOrderId', (req, res) => {
-  const msgs = chatMessages.filter(m => m.subOrderId === req.params.subOrderId);
-  res.json({ success: true, data: msgs });
+  res.json({ success: true, data: state.chatMessages.filter(m => m.subOrderId === req.params.subOrderId) });
 });
 
 app.post('/api/chat/:subOrderId', (req, res) => {
   const { subOrderId } = req.params;
   const { senderName, isFromCustomer, text } = req.body;
-  const now = new Date();
-  const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  if (!text || !String(text).trim()) {
+    return res.status(400).json({ success: false, message: 'Message text is required' });
+  }
 
+  const now = new Date();
   const newMsg = {
-    id: `msg_${Date.now()}`,
+    id: uid('msg'),
     subOrderId,
-    senderName,
+    senderName: senderName || (isFromCustomer ? 'Customer' : 'Restaurant'),
     isFromCustomer: Boolean(isFromCustomer),
-    text,
-    timestamp: timeStr
+    text: String(text),
+    timestamp: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+    sentAt: now.toISOString()
   };
 
-  chatMessages.push(newMsg);
+  state.chatMessages.push(newMsg);
+  save();
 
-  // Broadcast to both Customer and Partner apps
-  io.emit(`chat_message_${subOrderId}`, newMsg);
-  res.json({ success: true, data: newMsg });
+  const { order, sub } = findSubOrder(subOrderId);
+  io.to(roomSubOrder(subOrderId)).emit('chat:new', newMsg);
+  if (sub) io.to(roomRestaurant(sub.restaurantId)).emit('chat:new', newMsg);
+  if (order) io.to(roomCustomer(order.userId)).emit('chat:new', newMsg);
+
+  res.status(201).json({ success: true, data: newMsg });
 });
 
-// Static Admin Panel Serving (when deployed as unified service)
-const adminDistPath = path.join(__dirname, '../admin-panel/dist');
-const localDistPath = path.join(__dirname, 'dist');
-if (require('fs').existsSync(adminDistPath)) {
-  app.use(express.static(adminDistPath));
-  app.use((req, res, next) => {
-    if (req.path.startsWith('/api') || req.path === '/health') return next();
-    res.sendFile(path.join(adminDistPath, 'index.html'));
+// ---------------------------------------------------------------------------
+// Reviews
+// ---------------------------------------------------------------------------
+
+app.get('/api/reviews/:restaurantId', (req, res) => {
+  res.json({ success: true, data: state.reviews.filter(r => r.restaurantId === req.params.restaurantId) });
+});
+
+app.post('/api/reviews', (req, res) => {
+  const { restaurantId, subOrderId, customerId, customerName, rating, comment, orderedDishes } = req.body;
+  const rest = findRestaurant(restaurantId);
+  if (!rest) return res.status(404).json({ success: false, message: 'Restaurant not found' });
+
+  const score = Number(rating);
+  if (!(score >= 1 && score <= 5)) {
+    return res.status(400).json({ success: false, message: 'rating must be between 1 and 5' });
+  }
+
+  const review = {
+    id: uid('rev'),
+    restaurantId,
+    subOrderId: subOrderId || '',
+    customerId: customerId || 'user_101',
+    customerName: customerName || 'Customer',
+    rating: score,
+    comment: comment || '',
+    orderedDishes: Array.isArray(orderedDishes) ? orderedDishes : [],
+    createdAt: new Date().toISOString()
+  };
+  state.reviews.unshift(review);
+
+  // Recompute the restaurant's running average.
+  rest.ratingSum = (rest.ratingSum || 0) + score;
+  rest.totalRatings = (rest.totalRatings || 0) + 1;
+  rest.rating = Number((rest.ratingSum / rest.totalRatings).toFixed(2));
+
+  if (subOrderId) {
+    const { sub } = findSubOrder(subOrderId);
+    if (sub) {
+      sub.isRated = true;
+      sub.ratingScore = score;
+    }
+  }
+  save();
+
+  io.emit('review:new', { restaurantId, review, rating: rest.rating, totalRatings: rest.totalRatings });
+  broadcastRestaurants();
+  res.status(201).json({ success: true, data: review, restaurant: rest });
+});
+
+// ---------------------------------------------------------------------------
+// Subscriptions
+// ---------------------------------------------------------------------------
+
+app.get('/api/partner/subscription/:restaurantId', (req, res) => {
+  const rest = findRestaurant(req.params.restaurantId);
+  if (!rest) return res.status(404).json({ success: false, message: 'Restaurant not found' });
+  res.json({ success: true, data: store.subscriptionView(rest) });
+});
+
+app.post('/api/partner/subscription/:restaurantId/activate', (req, res) => {
+  const rest = findRestaurant(req.params.restaurantId);
+  if (!rest) return res.status(404).json({ success: false, message: 'Restaurant not found' });
+
+  store.activatePaidPlan(rest);
+  const view = store.subscriptionView(rest);
+
+  io.to(roomRestaurant(rest.id)).emit('subscription:updated', view);
+  io.to(ROOM_ADMIN).emit('subscription:updated', { restaurantId: rest.id, ...view });
+  broadcastRestaurants();
+
+  res.json({ success: true, data: view });
+});
+
+// ---------------------------------------------------------------------------
+// Admin
+// ---------------------------------------------------------------------------
+
+app.get('/api/admin/restaurants', (req, res) => {
+  const rows = state.restaurants.map(r => ({
+    ...r,
+    subscription: store.subscriptionView(r),
+    menuItemCount: menuFor(r.id).length,
+    totalOrders: state.orders.reduce((n, o) => n + o.subOrders.filter(s => s.restaurantId === r.id).length, 0)
+  }));
+  res.json({ success: true, data: rows });
+});
+
+app.patch('/api/admin/restaurants/:id/subscription', (req, res) => {
+  const rest = findRestaurant(req.params.id);
+  if (!rest) return res.status(404).json({ success: false, message: 'Restaurant not found' });
+
+  const updated = store.setSubscriptionStatus(rest, req.body.status, req.body.reason);
+  if (!updated) {
+    return res.status(400).json({ success: false, message: `status must be one of ${Object.values(SUB_STATUS).join(', ')}` });
+  }
+
+  const view = store.subscriptionView(rest);
+  io.to(roomRestaurant(rest.id)).emit('subscription:updated', view);
+  io.to(ROOM_ADMIN).emit('subscription:updated', { restaurantId: rest.id, ...view });
+  broadcastRestaurants(); // suspended restaurants drop out of the customer feed
+
+  console.log(`[api] subscription for ${rest.name} set to ${rest.subscriptionStatus}`);
+  res.json({ success: true, data: { restaurant: rest, subscription: view } });
+});
+
+app.get('/api/admin/stats', (req, res) => {
+  const byStatus = s => state.restaurants.filter(r => r.subscriptionStatus === s).length;
+  const activePaid = byStatus(SUB_STATUS.PAID);
+  const trials = byStatus(SUB_STATUS.TRIAL);
+  const todayKey = new Date().toISOString().slice(0, 10);
+
+  const allSubOrders = state.orders.flatMap(o => o.subOrders);
+  const todayOrders = state.orders.filter(o => o.createdAt.slice(0, 10) === todayKey);
+
+  res.json({
+    success: true,
+    data: {
+      totalRestaurants: state.restaurants.length,
+      activePaid,
+      activeTrials: trials,
+      overdue: byStatus(SUB_STATUS.OVERDUE),
+      suspended: byStatus(SUB_STATUS.SUSPENDED),
+      currentMRR: activePaid * store.MONTHLY_PRICE,
+      projectedMRR: (activePaid + trials) * store.MONTHLY_PRICE,
+      monthlyPrice: store.MONTHLY_PRICE,
+      planName: store.PLAN_NAME,
+      trialDays: store.TRIAL_DAYS,
+      graceDays: store.GRACE_DAYS,
+      totalOrders: state.orders.length,
+      totalSubOrders: allSubOrders.length,
+      ordersToday: todayOrders.length,
+      gmvToday: Number(todayOrders.reduce((s, o) => s + o.totalPaid, 0).toFixed(2)),
+      liveSubOrders: allSubOrders.filter(s => ['PLACED', 'ACCEPTED', 'PREPARING', 'OUT_FOR_DELIVERY'].includes(s.status)).length,
+      deliveredToday: allSubOrders.filter(s => s.status === 'DELIVERED').length,
+      totalReviews: state.reviews.length
+    }
   });
-} else if (require('fs').existsSync(localDistPath)) {
-  app.use(express.static(localDistPath));
+});
+
+// ---------------------------------------------------------------------------
+// Partner analytics (computed from real orders)
+// ---------------------------------------------------------------------------
+
+app.get('/api/partner/analytics/:restaurantId', (req, res) => {
+  const restId = req.params.restaurantId;
+  const rows = state.orders.flatMap(o =>
+    o.subOrders.filter(s => s.restaurantId === restId).map(s => ({ ...s, createdAt: o.createdAt }))
+  );
+  const paid = rows.filter(s => s.status !== 'REJECTED' && s.status !== 'CANCELLED');
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const today = paid.filter(s => s.createdAt.slice(0, 10) === todayKey);
+
+  const itemTally = {};
+  paid.forEach(s => s.items.forEach(i => { itemTally[i.name] = (itemTally[i.name] || 0) + i.quantity; }));
+  const topSellingItems = Object.entries(itemTally).sort((a, b) => b[1] - a[1]).slice(0, 5)
+    .map(([name, count]) => ({ name, count }));
+
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const weeklyRevenueTrend = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000);
+    const key = d.toISOString().slice(0, 10);
+    const revenue = paid.filter(s => s.createdAt.slice(0, 10) === key)
+      .reduce((sum, s) => sum + s.subTotal + s.deliveryFee - s.discount, 0);
+    weeklyRevenueTrend.push({ day: dayNames[d.getDay()], revenue: Number(revenue.toFixed(2)) });
+  }
+
+  res.json({
+    success: true,
+    data: {
+      todayRevenue: Number(today.reduce((sum, s) => sum + s.subTotal + s.deliveryFee - s.discount, 0).toFixed(2)),
+      todayOrdersCount: today.length,
+      lifetimeOrdersCount: paid.length,
+      lifetimeRevenue: Number(paid.reduce((sum, s) => sum + s.subTotal + s.deliveryFee - s.discount, 0).toFixed(2)),
+      avgPrepTimeMinutes: paid.length
+        ? Math.round(paid.reduce((sum, s) => sum + (s.estimatedPrepMinutes || 20), 0) / paid.length)
+        : 20,
+      topSellingItems,
+      weeklyRevenueTrend
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Static admin panel (when deployed as one service)
+// ---------------------------------------------------------------------------
+
+const distCandidates = [
+  path.join(__dirname, '../admin-panel/dist'),
+  path.join(__dirname, 'dist')
+];
+const distPath = distCandidates.find(p => fs.existsSync(p));
+
+if (distPath) {
+  app.use(express.static(distPath));
   app.use((req, res, next) => {
     if (req.path.startsWith('/api') || req.path === '/health') return next();
-    res.sendFile(path.join(localDistPath, 'index.html'));
+    res.sendFile(path.join(distPath, 'index.html'));
   });
 } else {
   app.get('/', (req, res) => {
     res.json({
-      service: 'Restaurant Platform Backend Engine',
-      status: 'Active',
-      apiDocs: {
-        restaurants: '/api/restaurants',
-        orders: '/api/orders',
-        health: '/health'
-      }
+      service: 'OrderAra Backend',
+      status: 'active',
+      endpoints: ['/api/restaurants', '/api/orders', '/api/admin/stats', '/health']
     });
   });
 }
 
-// --- WEBSOCKET CONNECTION HANDLING ---
-io.on('connection', (socket) => {
-  console.log(`[Socket] Client connected: ${socket.id}`);
+// ---------------------------------------------------------------------------
+// Realtime — each client joins only the rooms it needs
+// ---------------------------------------------------------------------------
 
-  socket.on('disconnect', () => {
-    console.log(`[Socket] Client disconnected: ${socket.id}`);
+io.on('connection', (socket) => {
+  socket.on('join', (payload = {}) => {
+    const { role, restaurantId, userId, subOrderId } = payload;
+    if (role === 'partner' && restaurantId) socket.join(roomRestaurant(restaurantId));
+    if (role === 'customer' && userId) socket.join(roomCustomer(userId));
+    if (role === 'admin') socket.join(ROOM_ADMIN);
+    if (subOrderId) socket.join(roomSubOrder(subOrderId));
+    socket.emit('joined', { role, restaurantId, userId, subOrderId });
+    console.log(`[socket] ${socket.id} joined as ${role || 'guest'}${restaurantId ? ` (${restaurantId})` : ''}`);
   });
+
+  socket.on('watch:suborder', ({ subOrderId }) => {
+    if (subOrderId) socket.join(roomSubOrder(subOrderId));
+  });
+
+  socket.on('disconnect', () => {});
 });
+
+// ---------------------------------------------------------------------------
+// Subscription clock
+// ---------------------------------------------------------------------------
+
+function runSubscriptionSweep() {
+  const changed = store.sweepSubscriptions();
+  if (changed.length) {
+    changed.forEach(rest => {
+      const view = store.subscriptionView(rest);
+      io.to(roomRestaurant(rest.id)).emit('subscription:updated', view);
+      io.to(ROOM_ADMIN).emit('subscription:updated', { restaurantId: rest.id, ...view });
+      console.log(`[subscriptions] ${rest.name} -> ${rest.subscriptionStatus}`);
+    });
+    broadcastRestaurants();
+  }
+}
+
+runSubscriptionSweep();
+setInterval(runSubscriptionSweep, 60 * 60 * 1000);
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`⚡ OrderAra Unified Real-time Server running on port ${PORT}`);
+  console.log(`OrderAra backend listening on ${PORT} (data: ${store.DATA_FILE})`);
+  console.log(describeAuthMode());
 });
