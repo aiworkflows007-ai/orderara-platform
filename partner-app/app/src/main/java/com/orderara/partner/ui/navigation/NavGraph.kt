@@ -27,6 +27,13 @@ fun PartnerNavGraph(
 
     val authRepo = OrderAraPartnerApp.instance.authRepository
     val currentStaff by authRepo.currentStaff.collectAsState()
+    val restaurantId by authRepo.restaurantId.collectAsState()
+
+    // A phone that has not registered a restaurant yet has nothing to show on
+    // the order dashboard, so it starts in onboarding instead.
+    val startDestination = remember(restaurantId == null) {
+        if (restaurantId.isNullOrBlank()) Screen.Onboarding.route else Screen.Orders.route
+    }
 
     val showBottomBar = currentRoute in listOf(
         Screen.Orders.route,
@@ -55,7 +62,7 @@ fun PartnerNavGraph(
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Orders.route,
+            startDestination = startDestination,
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.Onboarding.route) {

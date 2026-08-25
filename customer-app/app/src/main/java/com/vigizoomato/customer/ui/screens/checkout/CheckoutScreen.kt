@@ -52,7 +52,19 @@ fun CheckoutScreen(
         PaymentOption("Wallets", "Wallets (Paytm / Amazon Pay)", "Direct balance deduction", Icons.Outlined.AccountBalanceWallet)
     )
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // A restaurant can close, go below its minimum, or be suspended between
+    // browsing and paying — the server says so and the customer is told.
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.dismissError()
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             AppHeader(
                 title = "Payment Options",

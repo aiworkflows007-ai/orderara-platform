@@ -22,6 +22,15 @@ class PartnerChatViewModel : ViewModel() {
         ChatUiState(messages = messages, inputText = text)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ChatUiState())
 
+    fun openThread(subOrderId: String) {
+        chatRepo.openThread(subOrderId)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        chatRepo.closeThread()
+    }
+
     fun onInputTextChanged(text: String) {
         _inputText.value = text
     }

@@ -1,7 +1,24 @@
-import React from 'react';
-import { Bell, Search, RefreshCw, Smartphone, ExternalLink } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import { getSocket } from '../api';
 
 export default function Header({ title, subtitle, onRefresh }) {
+  // Honest live indicator: green only while the socket is genuinely connected.
+  const [connected, setConnected] = useState(false);
+
+  useEffect(() => {
+    const s = getSocket();
+    setConnected(s.connected);
+    const onConnect = () => setConnected(true);
+    const onDisconnect = () => setConnected(false);
+    s.on('connect', onConnect);
+    s.on('disconnect', onDisconnect);
+    return () => {
+      s.off('connect', onConnect);
+      s.off('disconnect', onDisconnect);
+    };
+  }, []);
+
   return (
     <header className="h-16 border-b border-slate-800 bg-slate-900/60 backdrop-blur-md px-8 flex items-center justify-between sticky top-0 z-20">
       <div>
@@ -10,10 +27,15 @@ export default function Header({ title, subtitle, onRefresh }) {
       </div>
 
       <div className="flex items-center space-x-3">
-        {/* Connected Mobile Device Status Indicator */}
-        <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs font-semibold text-emerald-400">
-          <Smartphone className="w-3.5 h-3.5" />
-          <span>Device Connected: 00196654C005228</span>
+        <div
+          className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold border ${
+            connected
+              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+              : 'bg-red-500/10 border-red-500/20 text-red-400'
+          }`}
+        >
+          {connected ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
+          <span>{connected ? 'Live — synced with apps' : 'Disconnected'}</span>
         </div>
 
         {/* Sync Refresh Button */}
@@ -25,13 +47,6 @@ export default function Header({ title, subtitle, onRefresh }) {
           <RefreshCw className="w-4 h-4" />
         </button>
 
-        {/* Notifications */}
-        <div className="relative">
-          <button className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors relative">
-            <Bell className="w-4 h-4" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-orange-500" />
-          </button>
-        </div>
       </div>
     </header>
   );

@@ -29,6 +29,10 @@ fun PartnerChatScreen(
     viewModel: PartnerChatViewModel = viewModel(),
     modifier: Modifier = Modifier
 ) {
+    LaunchedEffect(subOrderId) {
+        viewModel.openThread(subOrderId)
+    }
+
     val uiState by viewModel.uiState.collectAsState()
     val orderMessages = uiState.messages.filter { it.subOrderId == subOrderId }
 

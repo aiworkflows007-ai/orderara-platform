@@ -1,6 +1,8 @@
 package com.vigizoomato.customer
 
 import android.app.Application
+import com.vigizoomato.customer.data.network.ApiConfig
+import com.vigizoomato.customer.data.network.RealtimeClient
 import com.vigizoomato.customer.data.repository.*
 
 class AppContainer {
@@ -19,6 +21,12 @@ class VigiZoomatoApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Connect first: repositories register their live-push handlers on
+        // construction, and the socket must exist before they do.
+        RealtimeClient.connect(ApiConfig.CUSTOMER_ID)
         container = AppContainer()
+        // Touch the repositories that poll so they start syncing at launch.
+        container.restaurantRepository
+        container.orderRepository
     }
 }

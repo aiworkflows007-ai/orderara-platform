@@ -26,7 +26,8 @@ data class CheckoutUiState(
     val selectedPaymentMethod: String = "UPI (Google Pay)",
     val isProcessingPayment: Boolean = false,
     val placedOrder: Order? = null,
-    val paymentSuccess: Boolean = false
+    val paymentSuccess: Boolean = false,
+    val errorMessage: String? = null
 )
 
 class CheckoutViewModel(
@@ -39,6 +40,7 @@ class CheckoutViewModel(
     private val _isProcessing = MutableStateFlow(false)
     private val _placedOrder = MutableStateFlow<Order?>(null)
     private val _paymentSuccess = MutableStateFlow(false)
+    private val _errorMessage = MutableStateFlow<String?>(null)
 
     private val paymentStateFlow = combine(
         _selectedPaymentMethod,
@@ -52,8 +54,9 @@ class CheckoutViewModel(
     val uiState: StateFlow<CheckoutUiState> = combine(
         cartRepository.cartItems,
         authRepository.currentUser,
-        paymentStateFlow
-    ) { _, user, pState ->
+        paymentStateFlow,
+        _errorMessage
+    ) { _, user, pState, error ->
         val currentAddr = user?.savedAddresses?.find { it.id == user.selectedAddressId }
             ?: user?.savedAddresses?.firstOrNull()
 
@@ -63,7 +66,8 @@ class CheckoutViewModel(
             selectedPaymentMethod = pState.selectedMethod,
             isProcessingPayment = pState.isProcessing,
             placedOrder = pState.order,
-            paymentSuccess = pState.isSuccess
+            paymentSuccess = pState.isSuccess,
+            errorMessage = error
         )
     }.stateIn(
         scope = viewModelScope,
@@ -75,30 +79,50 @@ class CheckoutViewModel(
         _selectedPaymentMethod.value = method
     }
 
+    fun dismissError() {
+        _errorMessage.value = null
+    }
+
+    /**
+     * Pays, then sends the cart to the server where it is split into one
+     * sub-order per restaurant. The order only counts as placed once the
+     * server confirms it — a closed or suspended restaurant is reported here
+     * instead of silently producing an order no kitchen will ever see.
+     */
     fun executePaymentAndPlaceOrder(deliveryInstructions: String, onOrderPlaced: (String) -> Unit) {
         viewModelScope.launch {
+            _errorMessage.value = null
             _isProcessing.value = true
             // Simulate payment gateway authentication and bank handshake
             delay(1800)
-            val summary = cartRepository.getCartSummary()
-            val addr = uiState.value.deliveryAddress ?: return@launch
 
-            val order = orderRepository.placeOrder(
+            val summary = cartRepository.getCartSummary()
+            val addr = uiState.value.deliveryAddress
+            val user = authRepository.currentUser.value
+            if (addr == null) {
+                _isProcessing.value = false
+                _errorMessage.value = "Please add a delivery address first"
+                return@launch
+            }
+
+            orderRepository.placeOrder(
                 cartSummary = summary,
                 deliveryAddress = addr,
                 paymentMethod = _selectedPaymentMethod.value,
-                deliveryInstructions = deliveryInstructions
-            )
-
-            // Clear Cart after successful checkout
-            cartRepository.clearCart()
-
-            _placedOrder.value = order
-            _paymentSuccess.value = true
-            _isProcessing.value = false
-
-            delay(600)
-            onOrderPlaced(order.id)
+                deliveryInstructions = deliveryInstructions,
+                customerName = user?.name ?: "Customer",
+                customerPhone = user?.phone ?: ""
+            ) { order, error ->
+                _isProcessing.value = false
+                if (order != null) {
+                    cartRepository.clearCart()
+                    _placedOrder.value = order
+                    _paymentSuccess.value = true
+                    onOrderPlaced(order.id)
+                } else {
+                    _errorMessage.value = error ?: "Could not place your order. Please try again."
+                }
+            }
         }
     }
 }

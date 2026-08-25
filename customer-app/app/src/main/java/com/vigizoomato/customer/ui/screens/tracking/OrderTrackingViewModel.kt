@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vigizoomato.customer.VigiZoomatoApp
 import com.vigizoomato.customer.data.models.Order
-import com.vigizoomato.customer.data.models.OrderStatus
 import com.vigizoomato.customer.data.repository.OrderRepository
 import kotlinx.coroutines.flow.*
 
@@ -34,8 +33,4 @@ class OrderTrackingViewModel(
         _orderId.value = orderId
     }
 
-    fun advanceSubOrderStatus(subOrderId: String, newStatus: OrderStatus) {
-        val ordId = _orderId.value ?: return
-        orderRepository.advanceSubOrderStatus(ordId, subOrderId, newStatus)
-    }
 }
